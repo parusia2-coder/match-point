@@ -953,8 +953,12 @@ orgs.put('/:id/schedules/:scheduleId', requireAuth, async (c) => {
             SET title = ?, description = ?, location = ?, start_time = ?, end_time = ?, event_type = ?
             WHERE id = ? AND org_id = ?
         `).bind(
-            title || existing.title, description || existing.description, location || existing.location,
-            start_time || existing.start_time, end_time || existing.end_time, event_type || existing.event_type,
+            title || existing.title,
+            description !== undefined ? (description || null) : existing.description,
+            location !== undefined ? (location || null) : existing.location,
+            start_time || existing.start_time,
+            end_time !== undefined ? (end_time || null) : existing.end_time,
+            event_type || existing.event_type,
             scheduleId, orgId
         ).run()
 
@@ -990,7 +994,116 @@ orgs.delete('/:id/schedules/:scheduleId', requireAuth, async (c) => {
     }
 })
 
-// 4. 단체 일정 출석부 조회
+// 3-1. 요일 기반 일괄 생성 (매주/격주 반복, 1년 단위)
+orgs.post('/:id/schedules/bulk-weekly', requireAuth, async (c) => {
+    try {
+        const user = c.get('adminUser')
+        const orgId = parseInt(c.req.param('id'), 10)
+        const b = await c.req.json()
+
+        const isSuperAdmin = user.global_role === 'super_admin'
+        const roleCheck = await c.env.DB.prepare('SELECT role FROM user_roles WHERE user_id = ? AND target_type = ? AND target_id = ?').bind(user.id, 'org', orgId).first() as any
+        const isOrgAdmin = roleCheck && roleCheck.role === 'admin'
+
+        if (!isSuperAdmin && !isOrgAdmin) {
+            return c.json({ error: '권한이 없습니다.' }, 403)
+        }
+
+        const { title, location, event_type = 'meeting', description,
+            day_of_week, start_hour, start_minute = 0,
+            end_hour, end_minute = 0,
+            start_date, end_date,
+            interval_weeks = 1, // 1=매주, 2=격주
+            exclude_dates = [] // 제외할 날짜들 (공휴일 등)
+        } = b
+
+        if (!title || day_of_week === undefined || !start_hour || !start_date || !end_date) {
+            return c.json({ error: '필수값을 입력해주세요 (제목, 요일, 시간, 시작/종료일)' }, 400)
+        }
+
+        const dayNum = parseInt(day_of_week) // 0=일, 1=월, ... 6=토
+        const intWeeks = Math.max(1, parseInt(interval_weeks) || 1)
+        const excludeSet = new Set(exclude_dates.map((d: string) => d.substring(0, 10)))
+
+        // 시작일부터 첫 번째 해당 요일 찾기
+        const sDate = new Date(start_date + 'T00:00:00')
+        const eDate = new Date(end_date + 'T23:59:59')
+
+        // 첫 번째 해당 요일로 이동
+        let cursor = new Date(sDate)
+        while (cursor.getDay() !== dayNum) {
+            cursor.setDate(cursor.getDate() + 1)
+        }
+
+        let inserted = 0
+        const schedules: any[] = []
+
+        while (cursor <= eDate) {
+            const dateStr = cursor.toISOString().substring(0, 10)
+
+            if (!excludeSet.has(dateStr)) {
+                const startDt = new Date(cursor)
+                startDt.setHours(parseInt(start_hour), parseInt(start_minute || 0), 0, 0)
+                let endDt: Date | null = null
+                if (end_hour) {
+                    endDt = new Date(cursor)
+                    endDt.setHours(parseInt(end_hour), parseInt(end_minute || 0), 0, 0)
+                }
+
+                schedules.push({
+                    start: startDt.toISOString(),
+                    end: endDt ? endDt.toISOString() : null
+                })
+            }
+
+            cursor.setDate(cursor.getDate() + 7 * intWeeks)
+        }
+
+        // 배치 INSERT
+        for (const s of schedules) {
+            const { success } = await c.env.DB.prepare(`
+                INSERT INTO schedules (org_id, title, description, location, start_time, end_time, event_type, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `).bind(orgId, title, description || null, location || null, s.start, s.end, event_type, user.id).run()
+            if (success) inserted++
+        }
+
+        return c.json({ message: `${inserted}건의 일정이 생성되었습니다.`, inserted }, 201)
+    } catch (e) {
+        return c.json({ error: (e as Error).message }, 500)
+    }
+})
+
+// 3-2. 전체 일정 초기화 (삭제)
+orgs.delete('/:id/schedules', requireAuth, async (c) => {
+    try {
+        const user = c.get('adminUser')
+        const orgId = parseInt(c.req.param('id'), 10)
+
+        const isSuperAdmin = user.global_role === 'super_admin'
+        const roleCheck = await c.env.DB.prepare('SELECT role FROM user_roles WHERE user_id = ? AND target_type = ? AND target_id = ?').bind(user.id, 'org', orgId).first() as any
+        const isOrgAdmin = roleCheck && roleCheck.role === 'admin'
+
+        if (!isSuperAdmin && !isOrgAdmin) {
+            return c.json({ error: '권한이 없습니다.' }, 403)
+        }
+
+        // 출석 데이터도 함께 삭제
+        const { results: scheds } = await c.env.DB.prepare('SELECT id FROM schedules WHERE org_id = ?').bind(orgId).all()
+        if (scheds && scheds.length > 0) {
+            const ids = (scheds as any[]).map(s => s.id)
+            for (const sid of ids) {
+                await c.env.DB.prepare('DELETE FROM schedule_attendances WHERE schedule_id = ?').bind(sid).run()
+            }
+        }
+
+        await c.env.DB.prepare('DELETE FROM schedules WHERE org_id = ?').bind(orgId).run()
+
+        return c.json({ message: `${scheds?.length || 0}건의 일정이 초기화되었습니다.` })
+    } catch (e) {
+        return c.json({ error: (e as Error).message }, 500)
+    }
+})
 orgs.get('/:id/schedules/:scheduleId/attendance', requireAuth, async (c) => {
     try {
         const orgId = parseInt(c.req.param('id'), 10)

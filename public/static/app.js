@@ -2141,106 +2141,247 @@ async function manageOrgSchedules(id) {
     const org = orgs.find(o => String(o.id) === String(id));
     if (!org) { showToast('단체를 찾을 수 없습니다.', 'error'); return; }
 
-    if (!org.plan_tier || org.plan_tier === 'free' || org.plan_tier === 'standard') {
-      showModal('📅 일정관리 기능 설정', `
-        <div style="text-align:center; padding:20px 0;">
-          <div style="font-size:3rem; margin-bottom:10px;">🔒</div>
-          <h3 style="font-size:1.3rem; margin-bottom:10px; color:var(--text-primary);">Pro 플랜 전용 기능</h3>
-          <p style="color:var(--text-muted); line-height:1.6;">📅 단체 일정 캘린더 및 참석 조사 모듈은<br>Pro 또는 Premium 플랜 전용 기능입니다.</p>
-          <button class="btn btn-primary" style="margin-top:20px; font-weight:800; background:#3b82f6; border-color:#3b82f6;" onclick="closeModal()">플랜 업그레이드 알아보기</button>
-        </div>
-      `, null);
-      document.getElementById('modalConfirm').style.display = 'none';
-      return;
-    }
-
     const schedules = await apiFetch('/api/orgs', '/' + id + '/schedules');
 
+    // 지난 일정 / 예정 일정 분리
+    const now = new Date();
+    const upcoming = schedules.filter(s => new Date(s.start_time) >= now);
+    const past = schedules.filter(s => new Date(s.start_time) < now);
+    const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+    const typeLabels = { meeting: '회의/모임', training: '훈련/연습', regular: '정기모임', tournament_prep: '대회준비', etc: '기타' };
+
+    const renderRow = (s) => {
+      const d = new Date(s.start_time);
+      const dayName = dayNames[d.getDay()];
+      const endStr = s.end_time ? ' ~ ' + new Date(s.end_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '';
+      const isPast = d < now;
+      return `
+        <tr style="border-bottom:1px solid var(--border); ${isPast ? 'opacity:0.5;' : ''}">
+          <td style="padding:10px; font-size:0.85rem; color:var(--text-muted); white-space:nowrap;">
+            ${d.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} (${dayName})<br>
+            <span style="font-size:0.8rem;">${d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}${endStr}</span>
+          </td>
+          <td style="padding:10px;"><b>${s.title}</b><br><span style="font-size:0.75rem;color:var(--text-muted)">${typeLabels[s.event_type] || s.event_type}${s.description ? ' · ' + s.description : ''}</span></td>
+          <td style="padding:10px;">${s.location || '-'}</td>
+          <td style="padding:10px; text-align:center; white-space:nowrap;">
+            <button class="btn btn-sm btn-primary" style="margin:2px;" onclick="manageOrgScheduleAttendance(${org.id}, ${s.id}, '${s.title.replace(/'/g, "\\'")}')">✅ 출석</button>
+            <button class="btn btn-sm" style="margin:2px; background:rgba(139,92,246,0.1); color:#8b5cf6;" onclick="editOrgSchedule(${org.id}, ${s.id}, '${s.title.replace(/'/g, "\\'")}', '${s.start_time}', '${s.location || ''}', '${s.end_time || ''}', '${(s.description || '').replace(/'/g, "\\'")}', '${s.event_type || 'meeting'}')">✏️</button>
+            <button class="btn btn-sm" style="margin:2px; background:rgba(239,68,68,0.1); color:#ef4444;" onclick="removeOrgSchedule(${org.id}, ${s.id})">🗑</button>
+          </td>
+        </tr>`;
+    };
+
+    // 올해/내년 기본값
+    const todayStr = new Date().toISOString().substring(0, 10);
+    const yearLater = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()).toISOString().substring(0, 10);
+
     showModal(`📅 ${org.name} 일정 통합 관리`, `
-      <div style="display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid #f1f5f9; padding-bottom:12px; margin-bottom:20px; flex-wrap:wrap; gap:10px;">
-        <h2 style="font-size:1.1rem; font-weight:800; color:var(--text-primary); margin:0;">조직 일정 (${schedules.length}건)</h2>
-        <div>
-          <button class="btn btn-sm" style="border:1px solid #10b981; color:#10b981; background:rgba(16,185,129,0.05);" onclick="showOrgAttendanceStats(${org.id})">📊 출석 통계 확인</button>
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--border); padding-bottom:12px; margin-bottom:16px; flex-wrap:wrap; gap:8px;">
+        <h2 style="font-size:1.1rem; font-weight:800; color:var(--text-primary); margin:0;">전체 일정 (${schedules.length}건 | 예정 ${upcoming.length} · 지난 ${past.length})</h2>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button class="btn btn-sm" style="border:1px solid #10b981; color:#10b981; background:rgba(16,185,129,0.05);" onclick="showOrgAttendanceStats(${org.id})">📊 출석통계</button>
+          <button class="btn btn-sm" style="border:1px solid #ef4444; color:#ef4444; background:rgba(239,68,68,0.05);" onclick="resetOrgSchedules(${org.id})">🗑 전체 초기화</button>
         </div>
       </div>
 
-      <div style="max-height: 300px; overflow-y:auto; margin-bottom:20px;">
+      <!-- 일정 목록 -->
+      <div style="max-height:280px; overflow-y:auto; margin-bottom:20px;">
         <table class="table" style="width:100%; border-collapse:collapse;">
           <thead style="background:var(--bg-card); position:sticky; top:0; box-shadow:0 1px 0 var(--border);">
             <tr>
               <th style="padding:10px; text-align:left;">일시</th>
               <th style="padding:10px; text-align:left;">행사명</th>
               <th style="padding:10px; text-align:left;">장소</th>
-              <th style="padding:10px; text-align:center;">출석/관리</th>
+              <th style="padding:10px; text-align:center;">관리</th>
             </tr>
           </thead>
           <tbody>
-            ${schedules.map(s => `
-              <tr style="border-bottom:1px solid var(--border);">
-                <td style="padding:10px; font-size:0.85rem; color:var(--text-muted);">
-                  ${new Date(s.start_time).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                </td>
-                <td style="padding:10px;"><b>${s.title}</b><br><span style="font-size:0.75rem;color:var(--text-muted)">${s.event_type}</span></td>
-                <td style="padding:10px;">${s.location || '-'}</td>
-                <td style="padding:10px; text-align:center;">
-                  <button class="btn btn-sm btn-primary" style="margin-right:4px;" onclick="manageOrgScheduleAttendance(${org.id}, ${s.id}, '${s.title}')">✅ 출석체크</button>
-                  <button class="btn btn-sm" style="margin-right:4px; background:rgba(139,92,246,0.1); color:#8b5cf6;" onclick="editOrgSchedule(${org.id}, ${s.id}, '${s.title}', '${s.start_time}', '${s.location || ''}')">수정</button>
-                  <button class="btn btn-sm" style="background:rgba(239,68,68,0.1); color:#ef4444;" onclick="removeOrgSchedule(${org.id}, ${s.id})">삭제</button>
-                </td>
-              </tr>
-            `).join('')}
-            ${schedules.length === 0 ? `<tr><td colspan="4" style="padding:20px; text-align:center; color:var(--text-muted);">예정된 일정이 없습니다.</td></tr>` : ''}
+            ${upcoming.map(renderRow).join('')}
+            ${past.length > 0 ? `<tr><td colspan="4" style="padding:8px; text-align:center; font-size:0.8rem; color:var(--text-muted); background:rgba(255,255,255,0.02);">── 지난 일정 (${past.length}건) ──</td></tr>` : ''}
+            ${past.map(renderRow).join('')}
+            ${schedules.length === 0 ? '<tr><td colspan="4" style="padding:30px; text-align:center; color:var(--text-muted);">예정된 일정이 없습니다. 아래에서 일정을 등록해 보세요!</td></tr>' : ''}
           </tbody>
         </table>
       </div>
 
-      <div style="background:linear-gradient(135deg,#161616,#111); border:1px solid #2A2A2A; border-radius:12px; padding:16px;">
-        <h4 style="margin:0 0 12px 0; font-size:1rem; color:#fff;">새 일정 등록 (일괄 반복 생성 지원)</h4>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-          <div class="form-group" style="margin:0; grid-column:1/-1;">
-            <label>행사명</label>
-            <input type="text" id="asTitle" class="form-control" placeholder="예: 정기 임원 회의">
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label>시작 일시 (기준)</label>
-            <input type="datetime-local" id="asStart" class="form-control">
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label>장소</label>
-            <input type="text" id="asLocation" class="form-control" placeholder="장소명">
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label>유형</label>
-            <select id="asType" class="form-control">
-              <option value="meeting">회의/모임</option>
-              <option value="training">훈련/연습</option>
-              <option value="tournament_prep">대회준비</option>
-              <option value="etc">기타</option>
-            </select>
-          </div>
-          <div class="form-group" style="margin:0;">
-            <label>반복 생성 (현재 일시 기준)</label>
-            <select id="asRepeat" class="form-control">
-              <option value="0">반복 없음 (1회 생성)</option>
-              <option value="2">이후 2개월간 추가 생성</option>
-              <option value="5">이후 5개월간 추가 생성</option>
-              <option value="11">이후 11개월간 추가 생성 (1년치)</option>
-            </select>
-          </div>
+      <!-- 탭: 개별등록 / 일괄등록 -->
+      <div style="background:linear-gradient(135deg,#161616,#111); border:1px solid #2A2A2A; border-radius:12px; overflow:hidden;">
+        <div style="display:flex; border-bottom:1px solid #2A2A2A;">
+          <button id="schedTabSingle" class="btn" style="flex:1; border:none; border-radius:0; background:#222; color:#fff; font-weight:700; padding:12px;" onclick="switchScheduleTab('single')">📌 개별 등록</button>
+          <button id="schedTabBulk" class="btn" style="flex:1; border:none; border-radius:0; background:transparent; color:var(--text-muted); font-weight:700; padding:12px;" onclick="switchScheduleTab('bulk')">📋 일괄 등록 (요일 반복)</button>
         </div>
-        <button class="btn btn-primary" style="margin-top:16px; width:100%; background:linear-gradient(135deg,#f97316,#ea580c); border:none; color:#fff;" onclick="addOrgScheduleAction(${org.id})">일정(들) 추가하기</button>
+
+        <!-- 개별 등록 -->
+        <div id="schedPanelSingle" style="padding:16px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="form-group" style="margin:0; grid-column:1/-1;">
+              <label>행사명 *</label>
+              <input type="text" id="asTitle" class="form-control" placeholder="예: 3월 정기모임">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>시작 일시 *</label>
+              <input type="datetime-local" id="asStart" class="form-control">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>종료 일시</label>
+              <input type="datetime-local" id="asEnd" class="form-control">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>장소</label>
+              <input type="text" id="asLocation" class="form-control" placeholder="체육관/코트명">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>유형</label>
+              <select id="asType" class="form-control">
+                <option value="regular">정기모임</option>
+                <option value="meeting">회의/모임</option>
+                <option value="training">훈련/연습</option>
+                <option value="tournament_prep">대회준비</option>
+                <option value="etc">기타</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0; grid-column:1/-1;">
+              <label>설명/메모</label>
+              <input type="text" id="asDesc" class="form-control" placeholder="예: 코트 4면 예약 완료">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>반복 생성</label>
+              <select id="asRepeat" class="form-control">
+                <option value="0">반복 없음 (1회)</option>
+                <option value="2">매월 3개월간</option>
+                <option value="5">매월 6개월간</option>
+                <option value="11">매월 12개월간 (1년)</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary" style="margin-top:16px; width:100%; background:linear-gradient(135deg,#f97316,#ea580c); border:none; font-weight:800;" onclick="addOrgScheduleAction(${org.id})">📌 일정 추가하기</button>
+        </div>
+
+        <!-- 일괄 등록 -->
+        <div id="schedPanelBulk" style="padding:16px; display:none;">
+          <div style="background:rgba(249,115,22,0.1); border:1px solid rgba(249,115,22,0.3); border-radius:8px; padding:10px; margin-bottom:14px; font-size:0.85rem; color:#fbbf24;">
+            💡 <b>매주 반복되는 정기 일정</b>을 1년치 한꺼번에 생성합니다.<br>
+            예: "매주 토요일 09:00~12:00 정기모임" → 52건 자동 생성
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="form-group" style="margin:0; grid-column:1/-1;">
+              <label>행사명 *</label>
+              <input type="text" id="bsTitle" class="form-control" placeholder="예: 토요 정기모임">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>요일 *</label>
+              <select id="bsDayOfWeek" class="form-control">
+                <option value="1">월요일</option>
+                <option value="2">화요일</option>
+                <option value="3">수요일</option>
+                <option value="4">목요일</option>
+                <option value="5">금요일</option>
+                <option value="6" selected>토요일</option>
+                <option value="0">일요일</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>반복 주기</label>
+              <select id="bsInterval" class="form-control">
+                <option value="1">매주</option>
+                <option value="2">격주</option>
+                <option value="4">매월 (4주마다)</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>시작 시간 *</label>
+              <input type="time" id="bsStartTime" class="form-control" value="09:00">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>종료 시간</label>
+              <input type="time" id="bsEndTime" class="form-control" value="12:00">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>기간 시작일 *</label>
+              <input type="date" id="bsStartDate" class="form-control" value="${todayStr}">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>기간 종료일 *</label>
+              <input type="date" id="bsEndDate" class="form-control" value="${yearLater}">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>장소</label>
+              <input type="text" id="bsLocation" class="form-control" placeholder="체육관/코트명">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>유형</label>
+              <select id="bsType" class="form-control">
+                <option value="regular">정기모임</option>
+                <option value="training">훈련/연습</option>
+                <option value="meeting">회의/모임</option>
+                <option value="etc">기타</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0; grid-column:1/-1;">
+              <label>설명/메모</label>
+              <input type="text" id="bsDesc" class="form-control" placeholder="예: 안양 시민체육관 코트 3~4면">
+            </div>
+          </div>
+          <div id="bulkPreview" style="margin-top:12px; padding:10px; background:rgba(255,255,255,0.03); border-radius:8px; font-size:0.85rem; color:var(--text-muted);"></div>
+          <button class="btn btn-primary" style="margin-top:12px; width:100%; background:linear-gradient(135deg,#8b5cf6,#6366f1); border:none; font-weight:800;" onclick="addBulkWeeklySchedule(${org.id})">📋 일괄 생성하기</button>
+        </div>
       </div>
     `, null, { hideConfirm: true, wide: true });
+
+    // 일괄생성 미리보기 업데이트
+    const updateBulkPreview = () => {
+      const dow = parseInt(document.getElementById('bsDayOfWeek')?.value || '6');
+      const interval = parseInt(document.getElementById('bsInterval')?.value || '1');
+      const sd = document.getElementById('bsStartDate')?.value;
+      const ed = document.getElementById('bsEndDate')?.value;
+      if (!sd || !ed) return;
+      const dayName = dayNames[dow];
+      const sDate = new Date(sd + 'T00:00:00');
+      const eDate = new Date(ed + 'T23:59:59');
+      let cursor = new Date(sDate);
+      while (cursor.getDay() !== dow) cursor.setDate(cursor.getDate() + 1);
+      let count = 0;
+      while (cursor <= eDate) { count++; cursor.setDate(cursor.getDate() + 7 * interval); }
+      const prefix = interval === 1 ? '매주' : interval === 2 ? '격주' : '4주마다';
+      const previewEl = document.getElementById('bulkPreview');
+      if (previewEl) previewEl.innerHTML = `📊 <b>${prefix} ${dayName}요일</b> · ${sd} ~ ${ed} → 총 <b style="color:#f97316;">${count}건</b> 생성 예정`;
+    };
+    setTimeout(() => {
+      ['bsDayOfWeek', 'bsInterval', 'bsStartDate', 'bsEndDate'].forEach(elId => {
+        const el = document.getElementById(elId);
+        if (el) el.addEventListener('change', updateBulkPreview);
+      });
+      updateBulkPreview();
+    }, 100);
+
   } catch (e) {
     showToast('일정 정보를 불러오지 못했습니다.', 'error');
   }
 }
 
+window.switchScheduleTab = function (tab) {
+  const singleTab = document.getElementById('schedTabSingle');
+  const bulkTab = document.getElementById('schedTabBulk');
+  const singlePanel = document.getElementById('schedPanelSingle');
+  const bulkPanel = document.getElementById('schedPanelBulk');
+  if (tab === 'single') {
+    singleTab.style.background = '#222'; singleTab.style.color = '#fff';
+    bulkTab.style.background = 'transparent'; bulkTab.style.color = 'var(--text-muted)';
+    singlePanel.style.display = 'block'; bulkPanel.style.display = 'none';
+  } else {
+    bulkTab.style.background = '#222'; bulkTab.style.color = '#fff';
+    singleTab.style.background = 'transparent'; singleTab.style.color = 'var(--text-muted)';
+    bulkPanel.style.display = 'block'; singlePanel.style.display = 'none';
+  }
+};
+
 async function addOrgScheduleAction(orgId) {
   const title = document.getElementById('asTitle').value.trim();
   const rawStart = document.getElementById('asStart').value;
+  const rawEnd = document.getElementById('asEnd')?.value || '';
   const location = document.getElementById('asLocation').value.trim();
   const event_type = document.getElementById('asType').value;
+  const description = document.getElementById('asDesc')?.value?.trim() || '';
   const repeat_months = parseInt(document.getElementById('asRepeat').value) || 0;
 
   if (!title || !rawStart) {
@@ -2248,51 +2389,132 @@ async function addOrgScheduleAction(orgId) {
   }
 
   const start_time = new Date(rawStart).toISOString();
+  const end_time = rawEnd ? new Date(rawEnd).toISOString() : null;
 
   try {
     const res = await apiFetch('/api/orgs', '/' + orgId + '/schedules', {
       method: 'POST',
-      body: { title, start_time, location, event_type, repeat_months }
+      body: { title, start_time, end_time, location, event_type, description, repeat_months }
     });
-    showToast(res.message + (res.inserted > 1 ? ` (${res.inserted}개월 분량 일괄생성)` : ''), 'success');
-    manageOrgSchedules(orgId); // refresh
+    showToast(res.message + (res.inserted > 1 ? ` (${res.inserted}건 생성)` : ''), 'success');
+    manageOrgSchedules(orgId);
   } catch (e) {
     showToast(e.message, 'error');
   }
 }
 
-function editOrgSchedule(orgId, sId, currentTitle, currentStart, currentLocation) {
+async function addBulkWeeklySchedule(orgId) {
+  const title = document.getElementById('bsTitle').value.trim();
+  const day_of_week = document.getElementById('bsDayOfWeek').value;
+  const interval_weeks = document.getElementById('bsInterval').value;
+  const startTime = document.getElementById('bsStartTime').value;
+  const endTime = document.getElementById('bsEndTime').value;
+  const start_date = document.getElementById('bsStartDate').value;
+  const end_date = document.getElementById('bsEndDate').value;
+  const location = document.getElementById('bsLocation').value.trim();
+  const event_type = document.getElementById('bsType').value;
+  const description = document.getElementById('bsDesc')?.value?.trim() || '';
+
+  if (!title || !startTime || !start_date || !end_date) {
+    showToast('행사명, 시작시간, 기간을 입력해주세요.', 'error'); return;
+  }
+
+  const [sh, sm] = startTime.split(':').map(Number);
+  const [eh, em] = endTime ? endTime.split(':').map(Number) : [null, null];
+
+  try {
+    const res = await apiFetch('/api/orgs', '/' + orgId + '/schedules/bulk-weekly', {
+      method: 'POST',
+      body: {
+        title, day_of_week, interval_weeks,
+        start_hour: sh, start_minute: sm,
+        end_hour: eh, end_minute: em,
+        start_date, end_date,
+        location, event_type, description
+      }
+    });
+    showToast(res.message, 'success');
+    manageOrgSchedules(orgId);
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function resetOrgSchedules(orgId) {
+  if (!confirm('⚠️ 모든 일정과 출석 데이터가 삭제됩니다.\n정말 초기화하시겠습니까?')) return;
+  if (!confirm('❗ 한번 더 확인합니다. 되돌릴 수 없습니다. 계속하시겠습니까?')) return;
+  try {
+    const res = await apiFetch('/api/orgs', '/' + orgId + '/schedules', { method: 'DELETE' });
+    showToast(res.message, 'success');
+    manageOrgSchedules(orgId);
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+function editOrgSchedule(orgId, sId, currentTitle, currentStart, currentLocation, currentEnd, currentDesc, currentType) {
   // Convert UTC ISO to local datetime-local format
   const startLocal = new Date(currentStart);
   const tzOffset = startLocal.getTimezoneOffset() * 60000;
   const localISOTime = (new Date(startLocal.getTime() - tzOffset)).toISOString().slice(0, 16);
+  let localEndTime = '';
+  if (currentEnd) {
+    const endLocal = new Date(currentEnd);
+    localEndTime = (new Date(endLocal.getTime() - tzOffset)).toISOString().slice(0, 16);
+  }
 
   showModal(`✏️ 일정 수정`, `
     <div class="form-group">
       <label>행사명</label>
       <input type="text" id="esTitle" class="form-control" value="${currentTitle}">
     </div>
-    <div class="form-group">
-      <label>시작 일시</label>
-      <input type="datetime-local" id="esStart" class="form-control" value="${localISOTime}">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div class="form-group">
+        <label>시작 일시</label>
+        <input type="datetime-local" id="esStart" class="form-control" value="${localISOTime}">
+      </div>
+      <div class="form-group">
+        <label>종료 일시</label>
+        <input type="datetime-local" id="esEnd" class="form-control" value="${localEndTime}">
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div class="form-group">
+        <label>장소</label>
+        <input type="text" id="esLocation" class="form-control" value="${currentLocation}">
+      </div>
+      <div class="form-group">
+        <label>유형</label>
+        <select id="esType" class="form-control">
+          <option value="regular" ${currentType === 'regular' ? 'selected' : ''}>정기모임</option>
+          <option value="meeting" ${currentType === 'meeting' ? 'selected' : ''}>회의/모임</option>
+          <option value="training" ${currentType === 'training' ? 'selected' : ''}>훈련/연습</option>
+          <option value="tournament_prep" ${currentType === 'tournament_prep' ? 'selected' : ''}>대회준비</option>
+          <option value="etc" ${currentType === 'etc' ? 'selected' : ''}>기타</option>
+        </select>
+      </div>
     </div>
     <div class="form-group">
-      <label>장소</label>
-      <input type="text" id="esLocation" class="form-control" value="${currentLocation}">
+      <label>설명/메모</label>
+      <input type="text" id="esDesc" class="form-control" value="${currentDesc || ''}">
     </div>
   `, async () => {
     try {
+      const rawEnd = document.getElementById('esEnd').value;
       await apiFetch('/api/orgs', '/' + orgId + '/schedules/' + sId, {
         method: 'PUT',
         body: {
           title: document.getElementById('esTitle').value.trim(),
           start_time: new Date(document.getElementById('esStart').value).toISOString(),
-          location: document.getElementById('esLocation').value.trim()
+          end_time: rawEnd ? new Date(rawEnd).toISOString() : null,
+          location: document.getElementById('esLocation').value.trim(),
+          event_type: document.getElementById('esType').value,
+          description: document.getElementById('esDesc').value.trim()
         }
       });
       showToast('일정이 수정되었습니다.', 'success');
-      closeModal(); // close edit modal
-      manageOrgSchedules(orgId); // re-open schedule modal (implicitly replaces)
+      closeModal();
+      manageOrgSchedules(orgId);
     } catch (e) {
       showToast(e.message, 'error');
     }
