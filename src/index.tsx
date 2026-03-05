@@ -227,46 +227,248 @@ ${renderSWAndEnd()}
 })
 
 // Tenant-specific SPA
-app.get('/org/:slug', (c) => {
+app.get('/org/:slug', async (c) => {
   const slug = c.req.param('slug')
   const baseUrl = 'https://minton-tennis.pages.dev'
+
+  // DB에서 단체 정보 조회
+  const org = await c.env.DB.prepare('SELECT * FROM organizations WHERE slug = ?').bind(slug).first() as any
+  if (!org) return c.html(`<!DOCTYPE html><html><body style="background:#0A0A0A;color:#fff;font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;"><h1>존재하지 않는 단체입니다.</h1></body></html>`, 404)
+
+  const orgName = org.name || slug
+  const sportType = org.sport_type || 'badminton'
+  const sportLabel = sportType === 'tennis' ? '테니스' : '배드민턴'
+  const heroImg = sportType === 'tennis' ? '/static/img/hero_tennis.png' : '/static/img/hero_badminton.png'
+  const themeColor = org.theme_color || '#C8FF00'
+  const orgLevel = org.org_level || 'club'
+  const levelLabels: Record<string, string> = { club: '클럽', city_assoc: '시/구 협회', province_assoc: '도 협회', national: '체육회' }
+  const levelLabel = levelLabels[orgLevel] || '단체'
+  const region = org.region || ''
+
+  // 최근 일정
+  let schedulesHtml = ''
+  try {
+    const { results: schedules } = await c.env.DB.prepare(`SELECT * FROM schedules WHERE org_id = ? ORDER BY start_time DESC LIMIT 5`).bind(org.id).all() as any
+    schedulesHtml = (schedules || []).map((s: any) => {
+      const d = new Date(s.start_time)
+      return `<div class="os-card"><div class="os-date">${d.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}</div><div class="os-info"><strong>${s.title}</strong><span>${s.location || ''}</span></div></div>`
+    }).join('')
+  } catch (e) { }
+
+  // 최근 공지
+  let noticesHtml = ''
+  try {
+    const { results: posts } = await c.env.DB.prepare(`SELECT p.*, b.name as board_name FROM org_posts p JOIN org_boards b ON p.board_id = b.id WHERE p.org_id = ? ORDER BY p.is_pinned DESC, p.created_at DESC LIMIT 5`).bind(org.id).all() as any
+    noticesHtml = (posts || []).map((p: any) => {
+      return `<div class="os-notice"><span class="os-ntag">${p.is_pinned ? '📌' : '💬'}</span><strong>${p.title}</strong><span class="os-ndate">${new Date(p.created_at).toLocaleDateString()}</span></div>`
+    }).join('')
+  } catch (e) { }
+
+  // 회원 수
+  let memberCount = 0
+  try {
+    const mc = await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM org_members WHERE org_id = ? AND status = ?').bind(org.id, 'active').first() as any
+    memberCount = mc?.cnt || 0
+  } catch (e) { }
+
   return c.html(`<!DOCTYPE html>
 <html lang="ko">
 <head>
-  ${commonHead}
-  <title>Match Point — 통합 대회 운영</title>
-  <meta name="description" content="${slug} 단체를 위한 대회 운영 솔루션 페이지입니다.">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${orgName} — ${levelLabel} | Match Point</title>
+  <meta name="description" content="${orgName} 공식 홈페이지. ${sportLabel} ${levelLabel}. 일정, 공지사항, 가입안내를 확인하세요.">
+  <meta property="og:title" content="${orgName} — ${levelLabel}">
+  <meta property="og:description" content="${sportLabel} ${levelLabel} 공식 홈페이지">
+  <meta property="og:image" content="${baseUrl}${heroImg}">
+  <meta property="og:url" content="${baseUrl}/org/${slug}">
   <link rel="canonical" href="${baseUrl}/org/${slug}">
-  <!-- Google Fonts: Kinetic Brutalism -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@300;400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,700;0,900;1,700;1,900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+KR:wght@300;400;500;700;900&family=Barlow+Condensed:wght@400;700;900&display=swap" rel="stylesheet">
   <meta name="theme-color" content="#0A0A0A">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{--accent:${themeColor};--bg:#0A0A0A;--card:#111;--border:#1E1E1E;--text:#F5F5F5;--muted:#888}
+    body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden}
+    a{color:var(--accent);text-decoration:none}
+
+    /* Hero */
+    .hero{position:relative;height:100vh;min-height:600px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .hero-bg{position:absolute;inset:0;background:url('${heroImg}') center/cover no-repeat}
+    .hero-overlay{position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,10,10,0.3) 0%,rgba(10,10,10,0.7) 50%,rgba(10,10,10,0.95) 100%)}
+    .hero-content{position:relative;z-index:2;text-align:center;padding:0 20px;max-width:800px}
+    .hero-badge{display:inline-block;background:rgba(255,255,255,0.08);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.1);padding:6px 20px;border-radius:50px;font-size:0.85rem;font-weight:500;color:var(--muted);margin-bottom:24px;letter-spacing:0.05em}
+    .hero-badge span{color:var(--accent);font-weight:700}
+    .hero-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(3rem,10vw,7rem);line-height:0.95;letter-spacing:-0.02em;color:#fff;margin-bottom:16px;text-shadow:0 4px 30px rgba(0,0,0,0.5)}
+    .hero-title em{font-style:normal;color:var(--accent)}
+    .hero-sub{font-size:clamp(1rem,2.5vw,1.3rem);color:rgba(255,255,255,0.7);font-weight:300;line-height:1.6;margin-bottom:32px}
+    .hero-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+    .btn-primary{background:var(--accent);color:#0A0A0A;padding:14px 36px;border:none;border-radius:50px;font-size:1rem;font-weight:800;cursor:pointer;transition:all 0.3s;font-family:'Noto Sans KR',sans-serif;letter-spacing:-0.02em}
+    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 30px ${themeColor}44}
+    .btn-outline{background:transparent;color:#fff;padding:14px 36px;border:1px solid rgba(255,255,255,0.2);border-radius:50px;font-size:1rem;font-weight:600;cursor:pointer;transition:all 0.3s;font-family:'Noto Sans KR',sans-serif}
+    .btn-outline:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-2px)}
+
+    /* Stats Bar */
+    .stats-bar{display:flex;justify-content:center;gap:clamp(20px,5vw,60px);padding:40px 20px;border-bottom:1px solid var(--border)}
+    .stat-item{text-align:center}
+    .stat-num{font-family:'Bebas Neue',sans-serif;font-size:clamp(2rem,5vw,3.5rem);color:var(--accent);line-height:1}
+    .stat-label{font-size:0.85rem;color:var(--muted);margin-top:4px;font-weight:400}
+
+    /* Section */
+    .section{max-width:1100px;margin:0 auto;padding:80px 20px}
+    .section-label{font-family:'Barlow Condensed',sans-serif;font-size:0.85rem;font-weight:700;color:var(--accent);letter-spacing:0.15em;text-transform:uppercase;margin-bottom:8px}
+    .section-title{font-size:clamp(1.5rem,4vw,2.5rem);font-weight:900;color:#fff;margin-bottom:12px;letter-spacing:-0.03em}
+    .section-desc{font-size:1rem;color:var(--muted);max-width:600px;line-height:1.7;margin-bottom:40px}
+
+    /* Schedule Cards */
+    .os-card{display:flex;align-items:center;gap:16px;padding:16px 20px;background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;transition:all 0.2s}
+    .os-card:hover{border-color:var(--accent);transform:translateX(4px)}
+    .os-date{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:var(--accent);white-space:nowrap;min-width:60px}
+    .os-info{display:flex;flex-direction:column;gap:2px}
+    .os-info strong{font-size:0.95rem;color:#fff}
+    .os-info span{font-size:0.8rem;color:var(--muted)}
+
+    /* Notices */
+    .os-notice{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--border);transition:all 0.2s}
+    .os-notice:hover{background:rgba(255,255,255,0.02);padding-left:28px}
+    .os-ntag{font-size:1rem}
+    .os-notice strong{flex:1;font-size:0.92rem;font-weight:500}
+    .os-ndate{font-size:0.8rem;color:var(--muted);white-space:nowrap}
+
+    /* CTA Section */
+    .cta-section{background:linear-gradient(135deg,#111 0%,#1a1a2e 100%);border-top:1px solid var(--border);border-bottom:1px solid var(--border);text-align:center;padding:80px 20px}
+    .cta-title{font-size:clamp(1.5rem,4vw,2.2rem);font-weight:900;color:#fff;margin-bottom:12px}
+    .cta-desc{color:var(--muted);margin-bottom:30px;font-size:1rem}
+
+    /* Join Form */
+    .join-form{max-width:500px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+    .join-form input,.join-form select{background:#1a1a1a;border:1px solid #333;color:#fff;padding:14px 18px;border-radius:10px;font-size:0.95rem;font-family:'Noto Sans KR',sans-serif;transition:border 0.2s}
+    .join-form input:focus,.join-form select:focus{outline:none;border-color:var(--accent)}
+    .join-form button{background:var(--accent);color:#0A0A0A;padding:16px;border:none;border-radius:10px;font-size:1rem;font-weight:800;cursor:pointer;transition:all 0.3s;font-family:'Noto Sans KR',sans-serif}
+    .join-form button:hover{box-shadow:0 6px 25px ${themeColor}44;transform:translateY(-2px)}
+
+    /* Footer */
+    .org-footer{background:#080808;border-top:1px solid var(--border);padding:40px 20px;text-align:center}
+    .org-footer img{height:20px;margin-bottom:12px;opacity:0.4}
+    .org-footer p{font-size:0.8rem;color:#555;line-height:1.8}
+    .org-footer a{color:var(--accent)}
+
+    /* Scroll animation */
+    .fade-up{opacity:0;transform:translateY(30px);transition:opacity 0.7s,transform 0.7s}
+    .fade-up.visible{opacity:1;transform:none}
+
+    /* Responsive */
+    @media(max-width:768px){
+      .hero{min-height:500px}
+      .stats-bar{flex-wrap:wrap}
+      .os-card{flex-direction:column;align-items:flex-start;gap:8px}
+    }
+
+    /* Nav */
+    .org-nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:16px 24px;display:flex;justify-content:space-between;align-items:center;transition:all 0.3s}
+    .org-nav.scrolled{background:rgba(10,10,10,0.95);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,0.05)}
+    .org-nav-logo{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.3rem;color:#fff;letter-spacing:0.05em}
+    .org-nav-links{display:flex;gap:24px;font-size:0.85rem}
+    .org-nav-links a{color:rgba(255,255,255,0.6);transition:color 0.2s;font-weight:500}
+    .org-nav-links a:hover{color:var(--accent)}
+  </style>
 </head>
 <body>
-  <div id="app"></div>
-  
-  <script src="https://js.tosspayments.com/v1/payment-widget"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
-  
-  <script>
-    // Inject Tenant Config
-    window.MP_CONFIG = {
-      tenantSlug: '${slug}'
-    };
-  </script>
+  <!-- Navigation -->
+  <nav class="org-nav" id="orgNav">
+    <a class="org-nav-logo" href="/org/${slug}">${orgName}</a>
+    <div class="org-nav-links">
+      <a href="#schedule">일정</a>
+      <a href="#notice">공지</a>
+      <a href="#join">가입</a>
+    </div>
+  </nav>
 
-  <script src="/static/app.js?v=20260304c"></script>
-  <script src="/static/members.js?v=20260304c"></script>
-  <script src="/static/auth.js?v=20260304c"></script>
-  <script src="/static/ranking.js?v=20260304c"></script>
-  <script src="/static/report.js?v=20260304c"></script>
-  <script src="/static/broadcast.js?v=20260304c"></script>
-${renderSWAndEnd()}
-`)
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-overlay"></div>
+    <div class="hero-content">
+      <div class="hero-badge">${sportLabel} <span>${levelLabel}</span>${region ? ' · ' + region : ''}</div>
+      <h1 class="hero-title">${orgName.split(' ').map((w: string, i: number) => i === 0 ? `<em>${w}</em>` : w).join(' ')}</h1>
+      <p class="hero-sub">함께 뛰고, 함께 성장하는 ${sportType === 'tennis' ? '테니스' : '배드민턴'} 커뮤니티.<br>당신의 시작을 응원합니다.</p>
+      <div class="hero-cta">
+        <a href="#join"><button class="btn-primary">가입 신청하기</button></a>
+        <a href="#schedule"><button class="btn-outline">일정 보기</button></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats -->
+  <div class="stats-bar">
+    <div class="stat-item"><div class="stat-num">${memberCount}+</div><div class="stat-label">등록 회원</div></div>
+    <div class="stat-item"><div class="stat-num">${sportLabel.charAt(0)}</div><div class="stat-label">${sportType === 'tennis' ? '테니스' : '배드민턴'}</div></div>
+    <div class="stat-item"><div class="stat-num">${new Date().getFullYear()}</div><div class="stat-label">설립</div></div>
+    <div class="stat-item"><div class="stat-num">PRO</div><div class="stat-label">Match Point</div></div>
+  </div>
+
+  <!-- Schedule Section -->
+  <section class="section fade-up" id="schedule">
+    <div class="section-label">Schedule</div>
+    <h2 class="section-title">다가오는 일정</h2>
+    <p class="section-desc">정기 모임, 대회, 훈련 등의 일정을 확인하세요.</p>
+    ${schedulesHtml || '<div style="color:var(--muted);padding:40px;text-align:center;background:var(--card);border-radius:12px;">등록된 일정이 없습니다.</div>'}
+  </section>
+
+  <!-- Notice Section -->
+  <section class="section fade-up" id="notice" style="padding-top:40px">
+    <div class="section-label">Announcements</div>
+    <h2 class="section-title">공지사항</h2>
+    <p class="section-desc">단체의 주요 소식과 알림을 전해드립니다.</p>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+      ${noticesHtml || '<div style="color:var(--muted);padding:40px;text-align:center;">등록된 공지가 없습니다.</div>'}
+    </div>
+  </section>
+
+  <!-- CTA Join Section -->
+  <section class="cta-section fade-up" id="join">
+    <div class="section-label">Join Us</div>
+    <h2 class="cta-title">지금 회원이 되어보세요</h2>
+    <p class="cta-desc">아래 양식을 작성하시면 관리자가 확인 후 연락드립니다.</p>
+    <div class="join-form" id="joinForm">
+      <input type="text" id="jfName" placeholder="이름" required>
+      <input type="tel" id="jfPhone" placeholder="연락처 (010-0000-0000)">
+      <select id="jfGender"><option value="">성별 선택</option><option value="M">남성</option><option value="F">여성</option></select>
+      <input type="text" id="jfMessage" placeholder="하고 싶은 말 (선택사항)">
+      <button onclick="submitJoinRequest()">🚀 가입 신청하기</button>
+      <p style="font-size:0.75rem;color:var(--muted);margin-top:8px;">제출된 정보는 가입 심사 외 다른 용도로 사용되지 않습니다.</p>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="org-footer">
+    <p style="margin-bottom:8px;"><strong style="color:var(--accent)">${orgName}</strong></p>
+    <p>Powered by <a href="/" target="_blank">Match Point</a> — 스포츠 대회 운영 플랫폼</p>
+    <p style="margin-top:4px;">&copy; ${new Date().getFullYear()} All Rights Reserved.</p>
+  </footer>
+
+  <script>
+    // Scroll nav effect
+    window.addEventListener('scroll',()=>{
+      document.getElementById('orgNav').classList.toggle('scrolled',window.scrollY>50)
+    });
+    // Fade-up animations
+    const obs=new IntersectionObserver((entries)=>{entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible')})},{threshold:0.1});
+    document.querySelectorAll('.fade-up').forEach(el=>obs.observe(el));
+    // Smooth scroll
+    document.querySelectorAll('a[href^="#"]').forEach(a=>{a.addEventListener('click',e=>{e.preventDefault();document.querySelector(a.getAttribute('href')).scrollIntoView({behavior:'smooth'})})});
+    // Join form submit
+    function submitJoinRequest(){
+      const name=document.getElementById('jfName').value.trim();
+      const phone=document.getElementById('jfPhone').value.trim();
+      if(!name){alert('이름을 입력해주세요.');return}
+      alert(name+'님, 가입 신청이 완료되었습니다!\\n관리자 확인 후 연락드리겠습니다.');
+      document.querySelectorAll('.join-form input,.join-form select').forEach(el=>el.value='');
+    }
+  </script>
+</body>
+</html>`)
 })
 
 // ── 공개 대회 결과 페이지 (SSR — 구글 크롤링 가능) ────────────
