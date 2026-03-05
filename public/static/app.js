@@ -1636,18 +1636,7 @@ async function manageOrgFinances(id) {
     const org = orgs.find(o => String(o.id) === String(id));
     if (!org) { showToast('단체를 찾을 수 없습니다.', 'error'); return; }
 
-    if (org.plan_tier !== 'premium') {
-      showModal('💳 재무관리 기능 설정', `
-        <div style="text-align:center; padding:20px 0;">
-          <div style="font-size:3rem; margin-bottom:10px;">🔒</div>
-          <h3 style="font-size:1.3rem; margin-bottom:10px; color:var(--text-primary);">Premium 플랜 업그레이드 필요</h3>
-          <p style="color:var(--text-muted); line-height:1.6;">💰 수입/지출 관리, N빵 정산, 통계 모듈은<br>최상위 Premium 플랜 전용 B2B 기능입니다.</p>
-          <button class="btn btn-primary" style="margin-top:20px; font-weight:800; background:#8b5cf6; border-color:#8b5cf6;" onclick="closeModal()">플랜 업그레이드 문의</button>
-        </div>
-      `, null);
-      document.getElementById('modalConfirm').style.display = 'none';
-      return;
-    }
+    // 회비/재정관리 — 모든 플랜에서 사용 가능
 
     const dues = await apiFetch('/api/orgs', '/' + id + '/dues');
     const expenses = await apiFetch('/api/orgs', '/' + id + '/expenses');
@@ -1997,6 +1986,7 @@ async function manageOrgSchedules(id) {
           <td style="padding:10px;">${s.location || '-'}</td>
           <td style="padding:10px; text-align:center; white-space:nowrap;">
             <button class="btn btn-sm btn-primary" style="margin:2px;" onclick="manageOrgScheduleAttendance(${org.id}, ${s.id}, '${s.title.replace(/'/g, "\\'")}')">✅ 출석</button>
+            <button class="btn btn-sm" style="margin:2px; background:rgba(16,185,129,0.1); color:#10b981;" onclick="generateQrAttendance(${org.id}, ${s.id}, '${s.title.replace(/'/g, "\\\\'")}')">📱QR</button>
             <button class="btn btn-sm" style="margin:2px; background:rgba(139,92,246,0.1); color:#8b5cf6;" onclick="editOrgSchedule(${org.id}, ${s.id}, '${s.title.replace(/'/g, "\\'")}', '${s.start_time}', '${s.location || ''}', '${s.end_time || ''}', '${(s.description || '').replace(/'/g, "\\'")}', '${s.event_type || 'meeting'}')">✏️</button>
             <button class="btn btn-sm" style="margin:2px; background:rgba(239,68,68,0.1); color:#ef4444;" onclick="removeOrgSchedule(${org.id}, ${s.id})">🗑</button>
           </td>
@@ -2477,6 +2467,65 @@ async function showOrgAttendanceStats(orgId) {
   }
 }
 
+// ===== 📱 QR 출석체크 =====
+window.generateQrAttendance = async function (orgId, scheduleId, title) {
+  try {
+    // QR 토큰 생성
+    const res = await apiFetch('/api/orgs', '/' + orgId + '/schedules/' + scheduleId + '/qr-token', { method: 'POST' });
+    const token = res.token;
+    const attendUrl = window.location.origin + '/qr-attend?org=' + orgId + '&token=' + token;
+
+    showModal('📱 QR 출석체크 — ' + title, `
+      <div style="text-align:center; padding:20px;">
+        <div style="background:#fff; display:inline-block; padding:20px; border-radius:16px; margin-bottom:16px;">
+          <div id="qrCodeContainer" style="width:250px; height:250px;"></div>
+        </div>
+        <p style="font-size:0.95rem; color:var(--text-primary); margin:12px 0 4px; font-weight:700;">📱 회원들이 이 QR을 스캔하면 출석체크됩니다</p>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin:0;">QR을 화면에 띄워놓거나 인쇄하여 사용하세요</p>
+        
+        <div style="margin-top:20px; background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:12px;">
+          <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">출석 링크 (직접 공유 가능)</div>
+          <input type="text" class="form-control" value="${attendUrl}" onclick="this.select()" readonly style="font-size:0.8rem; text-align:center;">
+          <div style="display:flex; gap:8px; margin-top:8px; justify-content:center;">
+            <button class="btn btn-sm" onclick="navigator.clipboard.writeText('${attendUrl}');showToast('링크 복사됨!','success')">📋 복사</button>
+            <button class="btn btn-sm" onclick="document.getElementById('qrCodeContainer').requestFullscreen?document.getElementById('qrCodeContainer').requestFullscreen():null" style="background:rgba(16,185,129,0.1); color:#10b981;">🔍 전체화면</button>
+          </div>
+        </div>
+      </div>
+    `, null, { hideConfirm: true });
+
+    // QR 코드 생성 (간단한 SVG 기반)
+    setTimeout(() => {
+      const container = document.getElementById('qrCodeContainer');
+      if (container) {
+        // QR 라이브러리 동적 로드
+        if (!window.QRCode) {
+          const script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js';
+          script.onload = () => renderQr(container, attendUrl);
+          document.head.appendChild(script);
+        } else {
+          renderQr(container, attendUrl);
+        }
+      }
+    }, 100);
+  } catch (e) { showToast('QR 생성 실패: ' + e.message, 'error'); }
+};
+
+function renderQr(container, url) {
+  try {
+    const qr = qrcode(0, 'M');
+    qr.addData(url);
+    qr.make();
+    container.innerHTML = qr.createSvgTag({ cellSize: 5, margin: 2, scalable: true });
+    container.querySelector('svg').style.width = '100%';
+    container.querySelector('svg').style.height = '100%';
+  } catch (e) {
+    // Fallback: Google Charts QR API
+    container.innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=' + encodeURIComponent(url) + '" style="width:250px;height:250px;" alt="QR Code">';
+  }
+}
+
 // ===== 📊 출석 통계 대시보드 =====
 async function showOrgDashboard(orgId) {
   try {
@@ -2818,12 +2867,18 @@ function showCreateOrgBoard(orgId) {
 
 async function manageOrgPosts(orgId, boardId, boardName) {
   try {
-    const posts = await apiFetch('/api/orgs', '/' + orgId + '/boards/' + boardId + '/posts');
+    const searchQ = window._boardSearchQ || '';
+    const url = '/' + orgId + '/boards/' + boardId + '/posts' + (searchQ ? '?search=' + encodeURIComponent(searchQ) : '');
+    const posts = await apiFetch('/api/orgs', url);
 
     showModal(`📑 [${boardName}] 게시글 목록`, `
-      <div style="display:flex; justify-content:space-between; margin-bottom:16px;">
-        <button class="btn btn-sm" onclick="manageOrgBoards(${orgId})">👈 게시판 목록으로</button>
-        <button class="btn btn-sm btn-primary" onclick="showCreateOrgPost(${orgId}, ${boardId}, '${boardName}')">✏️ 새 글 쓰기</button>
+      <div style="display:flex; justify-content:space-between; margin-bottom:12px; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-sm" onclick="manageOrgBoards(${orgId})">👈 게시판 목록</button>
+        <div style="display:flex; gap:6px; flex:1; max-width:400px;">
+          <input type="text" id="boardPostSearch" class="form-control" placeholder="🔍 검색..." value="${searchQ}" onkeyup="if(event.key==='Enter'){window._boardSearchQ=this.value;manageOrgPosts(${orgId},${boardId},'${boardName}')}" style="flex:1;">
+          <button class="btn btn-sm" onclick="window._boardSearchQ=document.getElementById('boardPostSearch').value;manageOrgPosts(${orgId},${boardId},'${boardName}')">검색</button>
+        </div>
+        <button class="btn btn-sm btn-primary" onclick="showCreateOrgPost(${orgId}, ${boardId}, '${boardName}')">✏️ 새 글</button>
       </div>
 
       <table class="table" style="width:100%; font-size:0.9rem;">
@@ -2837,18 +2892,16 @@ async function manageOrgPosts(orgId, boardId, boardName) {
           </tr>
         </thead>
         <tbody>
-          ${posts.map((p, i) => `
-            <tr style="border-bottom:1px solid var(--border); cursor:pointer;" onclick="manageOrgPostDetail(${orgId}, ${boardId}, ${p.id})">
-              <td style="padding:10px 8px; text-align:center; color:var(--text-muted);">${posts.length - i}</td>
-              <td style="padding:10px 8px;">
-                <b style="color:var(--text-primary);">${p.title}</b>
-                ${p.comment_count > 0 ? `<span style="font-size:0.75rem; color:#ef4444; margin-left:4px; font-weight:bold;">[${p.comment_count}]</span>` : ''}
-              </td>
-              <td style="padding:10px 8px; text-align:center;">${p.author_name}</td>
-              <td style="padding:10px 8px; text-align:center; color:var(--text-muted);">${p.views}</td>
-              <td style="padding:10px 8px; text-align:center; color:var(--text-muted); font-size:0.8rem;">${new Date(p.created_at).toLocaleDateString()}</td>
-            </tr>
-          `).join('')}
+          ${posts.map((p, i) => {
+      const pinBadge = p.is_pinned ? '<span style="background:#ef4444; color:#fff; font-size:0.65rem; padding:1px 6px; border-radius:4px; margin-right:6px; font-weight:700;">📌 공지</span>' : '';
+      return '<tr style="border-bottom:1px solid var(--border); cursor:pointer;' + (p.is_pinned ? 'background:rgba(239,68,68,0.04);' : '') + '" onclick="manageOrgPostDetail(' + orgId + ',' + boardId + ',' + p.id + ',\'' + boardName + '\')">' +
+        '<td style="padding:10px 8px; text-align:center; color:var(--text-muted);">' + (p.is_pinned ? '📌' : (posts.length - i)) + '</td>' +
+        '<td style="padding:10px 8px;">' + pinBadge + '<b style="color:var(--text-primary);">' + p.title + '</b>' + (p.comment_count > 0 ? '<span style="font-size:0.75rem; color:#ef4444; margin-left:4px; font-weight:bold;">[' + p.comment_count + ']</span>' : '') + '</td>' +
+        '<td style="padding:10px 8px; text-align:center;">' + p.author_name + '</td>' +
+        '<td style="padding:10px 8px; text-align:center; color:var(--text-muted);">' + p.views + '</td>' +
+        '<td style="padding:10px 8px; text-align:center; color:var(--text-muted); font-size:0.8rem;">' + new Date(p.created_at).toLocaleDateString() + '</td>' +
+        '</tr>';
+    }).join('')}
           ${posts.length === 0 ? '<tr><td colspan="5" style="text-align:center; padding:30px; color:var(--text-muted);">등록된 글이 아직 없습니다.</td></tr>' : ''}
         </tbody>
       </table>
@@ -2877,22 +2930,24 @@ function showCreateOrgPost(orgId, boardId, boardName) {
       await apiFetch('/api/orgs', '/' + orgId + '/boards/' + boardId + '/posts', {
         method: 'POST', body: { title, content }
       });
-      showToast('게시글이 성공적으로 등록되었습니다!', 'success');
-      manageOrgPosts(orgId, boardId, boardName); // refresh list
+      showToast('게시글이 등록되었습니다!', 'success');
+      manageOrgPosts(orgId, boardId, boardName);
     } catch (e) {
       showToast(e.message, 'error');
     }
   }, { wide: true });
 }
 
-async function manageOrgPostDetail(orgId, boardId, postId) {
+async function manageOrgPostDetail(orgId, boardId, postId, boardName) {
   try {
     const data = await apiFetch('/api/orgs', '/' + orgId + '/boards/' + boardId + '/posts/' + postId);
     const post = data.post;
     const comments = data.comments;
+    const bName = boardName || '게시판';
 
-    showModal(`📖 게시글 상세보기`, `
+    showModal('📖 게시글 상세보기', `
       <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:20px;">
+        ${post.is_pinned ? '<div style="background:rgba(239,68,68,0.1); color:#ef4444; padding:6px 12px; border-radius:8px; font-size:0.82rem; font-weight:700; margin-bottom:12px;">📌 공지로 고정된 글입니다</div>' : ''}
         <h2 style="margin:0 0 12px 0; font-size:1.3rem; color:var(--text-primary); border-bottom:1px solid #333; padding-bottom:12px;">${post.title}</h2>
         <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--text-muted); margin-bottom:20px;">
           <span>작성자: <b>${post.author_name}</b> &nbsp;|&nbsp; 조회수: ${post.views}</span>
@@ -2900,31 +2955,22 @@ async function manageOrgPostDetail(orgId, boardId, postId) {
         </div>
         <div style="min-height:100px; line-height:1.6; white-space:pre-wrap;">${post.content}</div>
         
-        <div style="text-align:right; margin-top:20px; border-top:1px solid #333; padding-top:12px;">
-          <button class="btn btn-sm" style="background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.3);" onclick="deleteOrgPost(${orgId}, ${boardId}, ${postId})">🗑️ 이 글 삭제</button>
+        <div style="display:flex; justify-content:flex-end; gap:6px; margin-top:20px; border-top:1px solid #333; padding-top:12px;">
+          <button class="btn btn-sm" style="background:rgba(249,115,22,0.1); color:#f97316; border:1px solid rgba(249,115,22,0.3);" onclick="togglePinOrgPost(${orgId}, ${boardId}, ${postId}, '${bName}')">${post.is_pinned ? '📌 고정 해제' : '📌 공지 고정'}</button>
+          <button class="btn btn-sm" style="background:rgba(59,130,246,0.1); color:#3b82f6; border:1px solid rgba(59,130,246,0.3);" onclick="editOrgPost(${orgId}, ${boardId}, ${postId}, '${bName}')">✏️ 수정</button>
+          <button class="btn btn-sm" style="background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.3);" onclick="deleteOrgPost(${orgId}, ${boardId}, ${postId})">🗑️ 삭제</button>
         </div>
       </div>
 
       <div style="background:linear-gradient(135deg,#161616,#111); border:1px solid #2A2A2A; border-radius:12px; padding:16px;">
-        <h3 style="margin:0 0 12px 0; font-size:1rem;">💬 댓글 달기</h3>
+        <h3 style="margin:0 0 12px 0; font-size:1rem;">💬 댓글 (${comments.length})</h3>
         <div style="display:flex; gap:8px;">
           <textarea id="ocContent" class="form-control" style="flex:1; height:45px; min-height:45px; resize:none;" placeholder="따뜻한 댓글을 남겨보세요!"></textarea>
           <button class="btn btn-primary" onclick="addOrgComment(${orgId}, ${boardId}, ${postId})" style="white-space:nowrap; padding:0 20px;">등록</button>
         </div>
 
         <div style="margin-top:20px; border-top:1px solid #333; padding-top:16px;">
-          ${comments.map(c => `
-            <div style="margin-bottom:12px; border-bottom:1px dashed #333; padding-bottom:12px;">
-              <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.85rem;">
-                <b>${c.author_name}</b>
-                <div style="display:flex; gap:8px; align-items:center;">
-                  <span style="color:var(--text-muted); font-size:0.75rem;">${new Date(c.created_at).toLocaleString()}</span>
-                  <button style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:0.75rem;" onclick="deleteOrgComment(${orgId}, ${boardId}, ${postId}, ${c.id})">삭제</button>
-                </div>
-              </div>
-              <div style="white-space:pre-wrap; font-size:0.95rem;">${c.content}</div>
-            </div>
-          `).join('')}
+          ${comments.map(c => '<div style="margin-bottom:12px; border-bottom:1px dashed #333; padding-bottom:12px;"><div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.85rem;"><b>' + c.author_name + '</b><div style="display:flex; gap:8px; align-items:center;"><span style="color:var(--text-muted); font-size:0.75rem;">' + new Date(c.created_at).toLocaleString() + '</span><button style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:0.75rem;" onclick="deleteOrgComment(' + orgId + ',' + boardId + ',' + postId + ',' + c.id + ')">삭제</button></div></div><div style="white-space:pre-wrap; font-size:0.95rem;">' + c.content + '</div></div>').join('')}
           ${comments.length === 0 ? '<div style="color:var(--text-muted); text-align:center; font-size:0.85rem; padding:10px;">첫 댓글을 남겨주세요! 😊</div>' : ''}
         </div>
       </div>
@@ -2934,41 +2980,28 @@ async function manageOrgPostDetail(orgId, boardId, postId) {
   }
 }
 
-async function addOrgComment(orgId, boardId, postId) {
-  const content = document.getElementById('ocContent').value.trim();
-  if (!content) { showToast('댓글 내용을 작성해주세요.', 'error'); return; }
-
+window.togglePinOrgPost = async function (orgId, boardId, postId, boardName) {
   try {
-    await apiFetch('/api/orgs', '/' + orgId + '/boards/' + boardId + '/posts/' + postId + '/comments', {
-      method: 'POST', body: { content }
-    });
-    showToast('댓글 등록 완료!', 'success');
-    manageOrgPostDetail(orgId, boardId, postId); // refresh
-  } catch (e) {
-    showToast(e.message, 'error');
-  }
-}
+    const res = await apiFetch('/api/orgs', '/' + orgId + '/boards/' + boardId + '/posts/' + postId + '/pin', { method: 'PATCH' });
+    showToast(res.message, 'success');
+    manageOrgPostDetail(orgId, boardId, postId, boardName);
+  } catch (e) { showToast(e.message, 'error'); }
+};
 
-async function deleteOrgPost(orgId, boardId, postId) {
-  if (!confirm('정말 이 게시글을 삭제하시겠습니까? (관련 댓글도 모두 삭제됩니다)')) return;
-  try {
-    await apiFetch('/api/orgs', '/' + orgId + '/boards/' + boardId + '/posts/' + postId, { method: 'DELETE' });
-    showToast('게시글이 삭제되었습니다.', 'success');
-    manageOrgPosts(orgId, boardId, '게시판'); // return to list
-  } catch (e) {
-    showToast(e.message, 'error');
-  }
-}
-
-async function deleteOrgComment(orgId, boardId, postId, commentId) {
-  if (!confirm('이 댓글을 삭제할까요?')) return;
-  try {
-    await apiFetch('/api/orgs', '/' + orgId + '/boards/' + boardId + '/posts/' + postId + '/comments/' + commentId, { method: 'DELETE' });
-    manageOrgPostDetail(orgId, boardId, postId); // refresh post view
-  } catch (e) {
-    showToast(e.message, 'error');
-  }
-}
+window.editOrgPost = async function (orgId, boardId, postId, boardName) {
+  const data = await apiFetch('/api/orgs', '/' + orgId + '/boards/' + boardId + '/posts/' + postId);
+  const p = data.post;
+  showModal('✏️ 게시글 수정', '<div class="form-group"><label>제목</label><input type="text" id="epTitle" class="form-control" value="' + (p.title || '').replace(/"/g, '&quot;') + '"></div><div class="form-group"><label>내용</label><textarea id="epContent" class="form-control" style="min-height:200px;">' + (p.content || '') + '</textarea></div>', async () => {
+    const title = document.getElementById('epTitle').value.trim();
+    const content = document.getElementById('epContent').value.trim();
+    if (!title || !content) return showToast('제목과 내용을 입력하세요.', 'error');
+    try {
+      await apiFetch('/api/orgs', '/' + orgId + '/boards/' + boardId + '/posts/' + postId, { method: 'PUT', body: { title, content } });
+      showToast('수정되었습니다.', 'success');
+      manageOrgPostDetail(orgId, boardId, postId, boardName);
+    } catch (e) { showToast(e.message, 'error'); }
+  }, { wide: true });
+};
 
 // ===== Organization Inventory Management (재고 관리) =====
 async function manageOrgInventory(id) {

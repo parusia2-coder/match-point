@@ -1175,6 +1175,94 @@ orgs.post('/:id/schedules/:scheduleId/attendance', requireAuth, async (c) => {
     }
 })
 
+// ── QR 출석체크 시스템 ──
+
+// QR 토큰 생성 (관리자가 일정에 대해 QR 생성)
+orgs.post('/:id/schedules/:scheduleId/qr-token', requireAuth, async (c) => {
+    try {
+        const orgId = parseInt(c.req.param('id'), 10)
+        const scheduleId = parseInt(c.req.param('scheduleId'), 10)
+
+        // 간단한 토큰 생성 (orgId + scheduleId + 랜덤)
+        const token = `qr_${orgId}_${scheduleId}_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 8)}`
+
+        // 토큰을 스케줄에 저장 (description 필드를 임시로 활용하거나 별도 필드)
+        await c.env.DB.prepare('UPDATE schedules SET qr_token = ? WHERE id = ? AND org_id = ?')
+            .bind(token, scheduleId, orgId).run()
+
+        return c.json({ token, url: `/qr-attend?token=${token}` })
+    } catch (e) {
+        return c.json({ error: (e as Error).message }, 500)
+    }
+})
+
+// QR 통해 출석 가능한 회원 목록 (토큰 기반, 인증 불필요)
+orgs.get('/:id/qr-attend/:token', async (c) => {
+    try {
+        const orgId = parseInt(c.req.param('id'), 10)
+        const token = c.req.param('token')
+
+        // 토큰 유효성 확인
+        const schedule = await c.env.DB.prepare('SELECT * FROM schedules WHERE qr_token = ? AND org_id = ?')
+            .bind(token, orgId).first() as any
+        if (!schedule) return c.json({ error: '유효하지 않은 QR 코드입니다.' }, 404)
+
+        // 소속 회원 목록
+        const { results: members } = await c.env.DB.prepare(`
+            SELECT om.member_id, m.name, om.affiliated_club
+            FROM org_members om JOIN members m ON om.member_id = m.id
+            WHERE om.org_id = ? AND om.status = 'active'
+            ORDER BY m.name ASC
+        `).bind(orgId).all()
+
+        // 이미 출석한 회원
+        const { results: attended } = await c.env.DB.prepare(`
+            SELECT member_id FROM schedule_attendances WHERE schedule_id = ? AND status = 'present'
+        `).bind(schedule.id).all()
+        const attendedIds = new Set((attended || []).map((a: any) => a.member_id))
+
+        return c.json({
+            schedule: { id: schedule.id, title: schedule.title, start_time: schedule.start_time },
+            members: (members || []).map((m: any) => ({ ...m, already_checked: attendedIds.has(m.member_id) }))
+        })
+    } catch (e) {
+        return c.json({ error: (e as Error).message }, 500)
+    }
+})
+
+// QR로 출석 등록 (인증 불필요 — 토큰으로 검증)
+orgs.post('/:id/qr-attend/:token', async (c) => {
+    try {
+        const orgId = parseInt(c.req.param('id'), 10)
+        const token = c.req.param('token')
+        const b = await c.req.json()
+
+        const schedule = await c.env.DB.prepare('SELECT * FROM schedules WHERE qr_token = ? AND org_id = ?')
+            .bind(token, orgId).first() as any
+        if (!schedule) return c.json({ error: '유효하지 않은 QR 코드입니다.' }, 404)
+
+        const memberIds: number[] = b.member_ids || []
+        if (memberIds.length === 0) return c.json({ error: '회원을 선택해주세요.' }, 400)
+
+        let checkedCount = 0
+        for (const memberId of memberIds) {
+            try {
+                await c.env.DB.prepare(`
+                    INSERT INTO schedule_attendances (schedule_id, member_id, status, checked_at)
+                    VALUES (?, ?, 'present', datetime('now'))
+                `).bind(schedule.id, memberId).run()
+                checkedCount++
+            } catch (e) {
+                // 이미 출석한 경우 무시
+            }
+        }
+
+        return c.json({ message: `${checkedCount}명 출석 처리 완료!`, checked: checkedCount })
+    } catch (e) {
+        return c.json({ error: (e as Error).message }, 500)
+    }
+})
+
 // 6. 단체 출석 통계 (랭킹/월별)
 orgs.get('/:id/attendance-stats', requireAuth, async (c) => {
     try {
@@ -1382,14 +1470,22 @@ orgs.get('/:id/boards/:boardId/posts', async (c) => {
     try {
         const orgId = parseInt(c.req.param('id'), 10)
         const boardId = parseInt(c.req.param('boardId'), 10)
+        const search = c.req.query('search') || ''
 
-        const { results } = await c.env.DB.prepare(`
+        let query = `
             SELECT p.*, 
                    (SELECT COUNT(*) FROM org_comments WHERE post_id = p.id) as comment_count
             FROM org_posts p
             WHERE p.org_id = ? AND p.board_id = ?
-            ORDER BY p.created_at DESC
-        `).bind(orgId, boardId).all()
+        `
+        const bindings: any[] = [orgId, boardId]
+        if (search) {
+            query += ` AND (p.title LIKE ? OR p.content LIKE ?) `
+            bindings.push(`%${search}%`, `%${search}%`)
+        }
+        query += ` ORDER BY p.is_pinned DESC, p.created_at DESC LIMIT 100`
+
+        const { results } = await c.env.DB.prepare(query).bind(...bindings).all()
         return c.json(results || [])
     } catch (e) {
         return c.json({ error: (e as Error).message }, 500)
@@ -1444,6 +1540,38 @@ orgs.delete('/:id/boards/:boardId/posts/:postId', requireAuth, async (c) => {
 
         await c.env.DB.prepare(`DELETE FROM org_posts WHERE id = ? AND org_id = ?`).bind(postId, orgId).run()
         return c.json({ message: '삭제 완료' })
+    } catch (e) {
+        return c.json({ error: (e as Error).message }, 500)
+    }
+})
+
+// 6-1. 게시글 수정
+orgs.put('/:id/boards/:boardId/posts/:postId', requireAuth, async (c) => {
+    try {
+        const orgId = parseInt(c.req.param('id'), 10)
+        const postId = parseInt(c.req.param('postId'), 10)
+        const b = await c.req.json()
+
+        await c.env.DB.prepare(`UPDATE org_posts SET title = ?, content = ? WHERE id = ? AND org_id = ?`)
+            .bind(b.title, b.content, postId, orgId).run()
+        return c.json({ message: '수정 완료' })
+    } catch (e) {
+        return c.json({ error: (e as Error).message }, 500)
+    }
+})
+
+// 6-2. 공지 고정/해제 토글
+orgs.patch('/:id/boards/:boardId/posts/:postId/pin', requireAuth, async (c) => {
+    try {
+        const orgId = parseInt(c.req.param('id'), 10)
+        const postId = parseInt(c.req.param('postId'), 10)
+
+        const post = await c.env.DB.prepare('SELECT is_pinned FROM org_posts WHERE id = ? AND org_id = ?').bind(postId, orgId).first() as any
+        if (!post) return c.json({ error: '게시글을 찾을 수 없습니다.' }, 404)
+
+        const newPinned = post.is_pinned ? 0 : 1
+        await c.env.DB.prepare('UPDATE org_posts SET is_pinned = ? WHERE id = ? AND org_id = ?').bind(newPinned, postId, orgId).run()
+        return c.json({ message: newPinned ? '공지로 고정합니다.' : '고정 해제합니다.', is_pinned: newPinned })
     } catch (e) {
         return c.json({ error: (e as Error).message }, 500)
     }
