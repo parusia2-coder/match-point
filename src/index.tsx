@@ -149,7 +149,7 @@ app.get('/', (c) => {
 <html lang="ko">
 <head>
   ${commonHead}
-  <title>🏆 Match Point — 스포츠 대회 운영 솔루션</title>
+  <title>Match Point — 스포츠 대회 운영 솔루션</title>
   <meta name="description" content="배드민턴·테니스 대회를 스마트하게 운영하세요. 실시간 점수, 대진표 자동 생성, 참가자 관리, 갤럭시 워치 연동까지 — 완전 무료.">
   <meta name="keywords" content="배드민턴대회,테니스대회,대회운영,스포츠토너먼트,점수판,대진표">
   <link rel="canonical" href="${baseUrl}/">
@@ -234,7 +234,7 @@ app.get('/org/:slug', (c) => {
 <html lang="ko">
 <head>
   ${commonHead}
-  <title>🏆 Match Point — 통합 대회 운영</title>
+  <title>Match Point — 통합 대회 운영</title>
   <meta name="description" content="${slug} 단체를 위한 대회 운영 솔루션 페이지입니다.">
   <link rel="canonical" href="${baseUrl}/org/${slug}">
   <!-- Google Fonts: Kinetic Brutalism -->
