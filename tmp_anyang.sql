@@ -1,0 +1,1 @@
+INSERT INTO organizations (owner_id, slug, name, sport_type, theme_color, site_layout) VALUES (1, 'anyang', '안양시 배드민턴 협회', 'badminton', '#1e3a8a', '{"hero":{"title":"안양시 배드민턴 협회 공식 홈페이지","subtitle":"Match Point에 오신 것을 환영합니다!"},"sections":["tournaments","ranking","notices"]}');

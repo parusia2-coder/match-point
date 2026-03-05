@@ -1,0 +1,857 @@
+/* ========================================
+   MATCH POINT — Premium Dark Theme Override
+   2026 Design System: Unified Dark Glass
+   ======================================== */
+
+/* ===== Force Dark Background Everywhere ===== */
+body,
+html {
+    background: #0a0a0f !important;
+    color: #e8e8ec !important;
+}
+
+#app {
+    background: #0a0a0f !important;
+    min-height: 100vh;
+}
+
+/* ===== Global Glass Card System ===== */
+[style*="background:var(--bg-card)"],
+[style*="background:#fff"],
+[style*="background: #fff"],
+[style*="background:white"],
+[style*="background: white"],
+[style*="background:rgba(255,255,255"],
+[style*="background: rgba(255,255,255"],
+.card,
+.stat-card,
+.tournament-card {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    color: #e8e8ec !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+}
+
+/* ===== Dashboard Content Area ===== */
+#dashboardContent {
+    color: #e8e8ec;
+}
+
+#dashboardContent h1,
+#dashboardContent h2,
+#dashboardContent h3 {
+    color: #f0f0f5 !important;
+}
+
+#dashboardContent p,
+#dashboardContent div {
+    color: #a0a0b0;
+}
+
+/* ===== Stats Cards — Bento Glass Style ===== */
+#dashboardContent>div>div[style*="grid"]>div[style*="border-radius:16px"] {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    backdrop-filter: blur(24px) !important;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+#dashboardContent>div>div[style*="grid"]>div[style*="border-radius:16px"]:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: rgba(200, 255, 0, 0.15) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+#dashboardContent>div>div[style*="grid"]>div[style*="border-radius:16px"]::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(200, 255, 0, 0.3), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+#dashboardContent>div>div[style*="grid"]>div[style*="border-radius:16px"]:hover::before {
+    opacity: 1;
+}
+
+/* ===== Section Headers ===== */
+#dashboardContent [style*="border-bottom"] {
+    border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ===== Org Card Restyling ===== */
+.mp-tournament-card,
+#dashboardContent [style*="border-left: 4px"] {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    border-radius: 16px !important;
+    color: #e8e8ec !important;
+    transition: all 0.3s ease !important;
+}
+
+.mp-tournament-card:hover,
+#dashboardContent [style*="border-left: 4px"]:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: rgba(200, 255, 0, 0.15) !important;
+}
+
+.mp-tournament-card h3 {
+    color: #f0f0f5 !important;
+}
+
+/* ===== Button Restyling — Pill Glass Buttons ===== */
+#dashboardContent button[style*="font-family:'Barlow"] {
+    border-radius: 8px !important;
+    font-family: 'Inter', 'Outfit', sans-serif !important;
+    backdrop-filter: blur(12px) !important;
+    transition: all 0.25s ease !important;
+    letter-spacing: 0.01em !important;
+    font-size: 0.82rem !important;
+}
+
+#dashboardContent button[style*="font-family:'Barlow"]:hover {
+    transform: translateY(-1px) !important;
+    filter: brightness(1.2) !important;
+}
+
+/* Main CTA button on org cards ===== */
+#dashboardContent button[style*="background:#C8FF00"] {
+    background: #C8FF00 !important;
+    color: #0A0A0A !important;
+    border-radius: 8px !important;
+    font-weight: 800 !important;
+    transition: all 0.25s ease !important;
+}
+
+#dashboardContent button[style*="background:#C8FF00"]:hover {
+    background: #d8ff33 !important;
+    box-shadow: 0 4px 20px rgba(200, 255, 0, 0.25) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* ===== Badge Restyling ===== */
+.mp-badge,
+.mp-badge-open {
+    background: rgba(200, 255, 0, 0.12) !important;
+    color: #C8FF00 !important;
+    border: 1px solid rgba(200, 255, 0, 0.2) !important;
+    border-radius: 100px !important;
+    padding: 2px 10px !important;
+    font-size: 0.65rem !important;
+    font-weight: 700 !important;
+}
+
+/* ===== Primary Buttons (+ 새 대회 만들기 etc) ===== */
+.btn-primary,
+#dashboardContent button[style*="background:#f97316"],
+#dashboardContent button[style*="background:#8b5cf6"] {
+    background: linear-gradient(135deg, #C8FF00, #a0e000) !important;
+    color: #0A0A0A !important;
+    border: none !important;
+    border-radius: 10px !important;
+    font-weight: 800 !important;
+    transition: all 0.25s ease !important;
+    box-shadow: 0 2px 12px rgba(200, 255, 0, 0.15) !important;
+}
+
+.btn-primary:hover,
+#dashboardContent button[style*="background:#f97316"]:hover,
+#dashboardContent button[style*="background:#8b5cf6"]:hover {
+    background: linear-gradient(135deg, #d8ff33, #b0f000) !important;
+    box-shadow: 0 4px 24px rgba(200, 255, 0, 0.3) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* ===== Tournament Cards in Dashboard ===== */
+#dashboardContent [style*="display:grid"]>div[style*="border-left:3px"] {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    border-left: 3px solid currentColor !important;
+    border-radius: 14px !important;
+    color: #e8e8ec !important;
+    transition: all 0.3s ease !important;
+}
+
+#dashboardContent [style*="display:grid"]>div[style*="border-left:3px"]:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: rgba(200, 255, 0, 0.15) !important;
+    transform: translateY(-3px) !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Tournament card buttons */
+#dashboardContent [style*="border-left:3px"] button {
+    backdrop-filter: blur(10px) !important;
+    transition: all 0.2s ease !important;
+}
+
+/* ===== Tournament Detail Page ===== */
+.header {
+    background: rgba(10, 10, 15, 0.9) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+    backdrop-filter: blur(20px) !important;
+}
+
+.header h1 {
+    background: linear-gradient(135deg, #C8FF00, #38bdf8) !important;
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+}
+
+/* ===== Tabs ===== */
+.tabs {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    border-radius: 12px !important;
+}
+
+.tab {
+    color: #808090 !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+}
+
+.tab:hover {
+    color: #C8FF00 !important;
+    background: rgba(200, 255, 0, 0.05) !important;
+}
+
+.tab.active {
+    background: linear-gradient(135deg, #C8FF00, #a0e000) !important;
+    color: #0A0A0A !important;
+    font-weight: 700 !important;
+}
+
+/* ===== Cards ===== */
+.card {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    backdrop-filter: blur(20px) !important;
+    color: #e8e8ec !important;
+}
+
+.card:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: rgba(200, 255, 0, 0.12) !important;
+}
+
+.card-title,
+.card-header {
+    color: #f0f0f5 !important;
+}
+
+/* ===== Tables ===== */
+.data-table th {
+    color: #808090 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+    background: rgba(255, 255, 255, 0.02) !important;
+    font-size: 0.75rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+}
+
+.data-table td {
+    color: #c0c0cc !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+}
+
+.data-table tr:hover td {
+    background: rgba(200, 255, 0, 0.03) !important;
+}
+
+/* ===== Forms ===== */
+.form-control {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    color: #e8e8ec !important;
+}
+
+.form-control:focus {
+    border-color: #C8FF00 !important;
+    box-shadow: 0 0 0 3px rgba(200, 255, 0, 0.1) !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.form-control::placeholder {
+    color: #555 !important;
+}
+
+.form-group label {
+    color: #808090 !important;
+}
+
+select.form-control {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23808090' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E") !important;
+}
+
+/* ===== Modals ===== */
+.modal-overlay {
+    background: rgba(0, 0, 0, 0.7) !important;
+    backdrop-filter: blur(8px) !important;
+}
+
+.modal {
+    background: #141418 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5) !important;
+    color: #e8e8ec !important;
+}
+
+.modal-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.modal-header h2 {
+    color: #f0f0f5 !important;
+}
+
+.modal-footer {
+    border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.modal-close {
+    background: rgba(255, 255, 255, 0.05) !important;
+    color: #808090 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.modal-close:hover {
+    background: rgba(239, 68, 68, 0.2) !important;
+    color: #ef4444 !important;
+}
+
+/* ===== Buttons ===== */
+.btn {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    color: #c0c0cc !important;
+    backdrop-filter: blur(10px) !important;
+}
+
+.btn:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+    color: #fff !important;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #C8FF00, #a0e000) !important;
+    border: none !important;
+    color: #0A0A0A !important;
+}
+
+.btn-primary:hover {
+    box-shadow: 0 4px 20px rgba(200, 255, 0, 0.25) !important;
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+    border: none !important;
+    color: #fff !important;
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+    border: none !important;
+    color: #fff !important;
+}
+
+/* ===== Toast ===== */
+.toast {
+    background: rgba(20, 20, 25, 0.95) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    color: #e8e8ec !important;
+    backdrop-filter: blur(24px) !important;
+}
+
+/* ===== Stat Cards ===== */
+.stat-card {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.stat-value {
+    color: #C8FF00 !important;
+}
+
+.stat-label {
+    color: #808090 !important;
+}
+
+/* ===== Empty State ===== */
+.empty-state {
+    background: rgba(255, 255, 255, 0.02) !important;
+    border: 1px dashed rgba(200, 255, 0, 0.15) !important;
+    color: #808090 !important;
+}
+
+.empty-state h3 {
+    color: #c0c0cc !important;
+}
+
+/* ===== Quick Links ===== */
+.quick-link {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    color: #c0c0cc !important;
+}
+
+.quick-link:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: rgba(200, 255, 0, 0.2) !important;
+    color: #C8FF00 !important;
+}
+
+/* ===== Dropdown Nav ===== */
+.nd-trigger {
+    color: #808090 !important;
+}
+
+.nd-trigger:hover,
+.nd-trigger.nd-open {
+    color: #fff !important;
+    background: rgba(200, 255, 0, 0.06) !important;
+}
+
+.nd-trigger.active {
+    color: #C8FF00 !important;
+    background: rgba(200, 255, 0, 0.08) !important;
+}
+
+.nd-menu {
+    background: #1a1a22 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5) !important;
+}
+
+.nd-item {
+    color: #a0a0b0 !important;
+}
+
+.nd-item:hover {
+    background: rgba(200, 255, 0, 0.06) !important;
+    color: #C8FF00 !important;
+}
+
+.nd-divider {
+    background: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ===== Scrollbar for Dark ===== */
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* ===== Loading ===== */
+.spinner {
+    border-color: rgba(255, 255, 255, 0.06) !important;
+    border-top-color: #C8FF00 !important;
+}
+
+/* ===== Badges ===== */
+.badge-success {
+    background: rgba(200, 255, 0, 0.12) !important;
+    color: #C8FF00 !important;
+}
+
+.badge-warning {
+    background: rgba(245, 158, 11, 0.15) !important;
+    color: #fbbf24 !important;
+}
+
+.badge-danger {
+    background: rgba(239, 68, 68, 0.15) !important;
+    color: #f87171 !important;
+}
+
+.badge-info {
+    background: rgba(56, 189, 248, 0.15) !important;
+    color: #38bdf8 !important;
+}
+
+.badge-muted {
+    background: rgba(255, 255, 255, 0.05) !important;
+    color: #606070 !important;
+}
+
+.badge-purple {
+    background: rgba(167, 139, 250, 0.15) !important;
+    color: #a78bfa !important;
+}
+
+/* ===== Tournament Detail Header ===== */
+#app>.header+.container {
+    color: #e8e8ec;
+}
+
+/* ===== Match Items ===== */
+.match-item {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    color: #e8e8ec !important;
+}
+
+/* ===== Checkbox ===== */
+.checkbox-label {
+    color: #c0c0cc !important;
+}
+
+/* ===== Inline-style color overrides ===== */
+[style*="color:#0f172a"],
+[style*="color: #0f172a"],
+[style*="color:#1e293b"],
+[style*="color: #1e293b"] {
+    color: #e8e8ec !important;
+}
+
+[style*="color:#64748b"],
+[style*="color: #64748b"],
+[style*="color:#475569"],
+[style*="color: #475569"] {
+    color: #808090 !important;
+}
+
+[style*="color:#94a3b8"],
+[style*="color: #94a3b8"] {
+    color: #606070 !important;
+}
+
+[style*="background:#f8fafc"],
+[style*="background: #f8fafc"],
+[style*="background:#f1f5f9"],
+[style*="background: #f1f5f9"],
+[style*="background:#f0f4f8"] {
+    background: rgba(255, 255, 255, 0.03) !important;
+}
+
+[style*="border:1px solid #e2e8f0"],
+[style*="border: 1px solid #e2e8f0"] {
+    border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+[style*="border-bottom:1px solid #e2e8f0"],
+[style*="border-bottom: 1px solid #e2e8f0"],
+[style*="border-bottom:2px solid #f1f5f9"],
+[style*="border-bottom: 2px solid #f1f5f9"] {
+    border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+[style*="border:2px dashed #e2e8f0"],
+[style*="border: 2px dashed #e2e8f0"] {
+    border-color: rgba(200, 255, 0, 0.12) !important;
+}
+
+/* ===== Background Gradient Glow ===== */
+#dashboardContent::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(ellipse 50% 40% at 15% 20%, rgba(200, 255, 0, 0.04) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 50% at 80% 75%, rgba(139, 92, 246, 0.05) 0%, transparent 55%);
+    z-index: -1;
+}
+
+/* ===== Premium Animations ===== */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+#dashboardContent>div {
+    animation: fadeInUp 0.4s ease both;
+}
+
+#dashboardContent>div:nth-child(2) {
+    animation-delay: 0.05s;
+}
+
+#dashboardContent>div:nth-child(3) {
+    animation-delay: 0.1s;
+}
+
+#dashboardContent>div:nth-child(4) {
+    animation-delay: 0.15s;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+    #dashboardContent {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+}
+
+/* ========================================
+   PART 2 — Tournament Detail & Inner Pages
+   ======================================== */
+
+/* ===== Container (Tournament Detail) ===== */
+.container {
+    color: #e8e8ec !important;
+}
+
+.container h2,
+.container h3 {
+    color: #f0f0f5 !important;
+}
+
+/* ===== All generic tables inside #app ===== */
+#app table,
+.container table {
+    border-collapse: collapse;
+    color: #c0c0cc;
+}
+
+#app table th,
+.container table th {
+    background: rgba(255, 255, 255, 0.04) !important;
+    color: #808090 !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+#app table td,
+.container table td {
+    color: #c0c0cc !important;
+    border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+#app table tr:hover td,
+.container table tr:hover td {
+    background: rgba(200, 255, 0, 0.03) !important;
+}
+
+/* ===== Schedule Gantt Cards ===== */
+#scheduleGanttView {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+#scheduleTableView {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ===== Event Cards (종목 카드) ===== */
+.event-card,
+[style*="border-left:4px solid"] {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    color: #e8e8ec !important;
+}
+
+/* ===== Match List Table ===== */
+[style*="border-bottom:1px solid #f1f5f9"],
+[style*="border-bottom: 1px solid #f1f5f9"] {
+    border-bottom-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+/* ===== Any remaining #334155 dark-navy text → light ===== */
+[style*="color:#334155"],
+[style*="color: #334155"] {
+    color: #c0c0cc !important;
+}
+
+/* ===== Fix inline background for overview/detail cards ===== */
+[style*="background:var(--bg-card)"] {
+    background: rgba(255, 255, 255, 0.03) !important;
+}
+
+[style*="border:1px solid var(--border)"],
+[style*="border: 1px solid var(--border)"] {
+    border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+[style*="border-bottom:1px solid var(--border)"],
+[style*="border-bottom: 1px solid var(--border)"],
+[style*="border-top:1px solid var(--border)"],
+[style*="border-top: 1px solid var(--border)"] {
+    border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ===== var(--text-primary) and var(--text-muted) overrides ===== */
+[style*="color:var(--text-primary)"] {
+    color: #f0f0f5 !important;
+}
+
+[style*="color:var(--text-muted)"],
+[style*="color:var(--text-secondary)"] {
+    color: #808090 !important;
+}
+
+/* ===== Schedule btn overrides ===== */
+[style*="background:#10b981"],
+[style*="background: #10b981"] {
+    background: #C8FF00 !important;
+    color: #0A0A0A !important;
+}
+
+/* ===== Print Center (Screen - not print) ===== */
+.print-header {
+    background: linear-gradient(135deg, #0a0a0f, #1a1a28) !important;
+}
+
+.menu-bar {
+    background: rgba(10, 10, 15, 0.95) !important;
+    border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.menu-btn {
+    background: rgba(255, 255, 255, 0.04) !important;
+    color: #808090 !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.menu-btn:hover {
+    background: rgba(200, 255, 0, 0.06) !important;
+    color: #C8FF00 !important;
+    border-color: rgba(200, 255, 0, 0.2) !important;
+}
+
+.menu-btn.active {
+    background: linear-gradient(135deg, #C8FF00, #a0e000) !important;
+    color: #0A0A0A !important;
+    border-color: #C8FF00 !important;
+    font-weight: 700 !important;
+}
+
+/* Print content area stays WHITE for actual printing */
+.print-content {
+    background: #fff !important;
+    color: #1e293b !important;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+.print-fab {
+    background: linear-gradient(135deg, #C8FF00, #a0e000) !important;
+    color: #0A0A0A !important;
+    font-weight: 800 !important;
+}
+
+/* ===== Report Modal Styles for dark mode ===== */
+.rpt-header {
+    background: linear-gradient(135deg, #0a0a0f, #1a1a28) !important;
+}
+
+/* ===== Wizard/Step indicators ===== */
+[style*="background:#e2e8f0"],
+[style*="background: #e2e8f0"] {
+    background: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ===== Overview Cards — Tournament Detail ===== */
+#app [style*="display:grid"]>div[style*="padding:16px"],
+#app [style*="display:grid"]>div[style*="padding: 16px"] {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border-color: rgba(255, 255, 255, 0.06) !important;
+    color: #e8e8ec !important;
+}
+
+/* ===== Fix all anchor/link colors in dark ===== */
+#app a:not(.lp-btn-cta):not(.lp-btn-ghost):not(.lp-logo):not([class*="btn"]) {
+    color: #C8FF00;
+}
+
+/* ===== Radio & Checkbox labels ===== */
+label {
+    color: #c0c0cc !important;
+}
+
+/* ===== Select option dropdown (in dark mode) ===== */
+select option {
+    background: #1a1a22 !important;
+    color: #e8e8ec !important;
+}
+
+/* ===== Generic inline table header fix ===== */
+[style*="background:#f1f5f9"] {
+    background: rgba(255, 255, 255, 0.04) !important;
+    color: #808090 !important;
+}
+
+/* ===== Thin border lines ===== */
+[style*="border:1px solid #d1d5db"],
+[style*="border:1px solid #cbd5e1"],
+[style*="border: 1px solid #d1d5db"],
+[style*="border: 1px solid #cbd5e1"] {
+    border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+[style*="border-bottom:2px solid #1e293b"],
+[style*="border-bottom: 2px solid #1e293b"] {
+    border-bottom-color: rgba(200, 255, 0, 0.3) !important;
+}
+
+/* ===== Bracket match cards ===== */
+.bracket-match {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+}
+
+.bracket-team {
+    color: #e8e8ec !important;
+    border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.bracket-team.winner {
+    background: rgba(200, 255, 0, 0.1) !important;
+    color: #C8FF00 !important;
+}
+
+.round-label {
+    color: #808090 !important;
+}
+
+/* ===== Section title in print (screen only) ===== */
+.section-title {
+    color: #1e293b;
+    border-bottom-color: #1e293b;
+}
+
+.group-title {
+    color: #475569;
+}
+
+/* ===== Status colors in schedule ===== */
+[style*="color:var(--accent)"] {
+    color: #C8FF00 !important;
+}
+
+/* ===== Fix CSS Variable fallbacks ===== */
+:root {
+    --bg-card: rgba(255, 255, 255, 0.03) !important;
+    --bg-body: #0a0a0f !important;
+    --border: rgba(255, 255, 255, 0.06) !important;
+    --text-primary: #f0f0f5 !important;
+    --text-secondary: #808090 !important;
+    --text-muted: #606070 !important;
+    --accent: #C8FF00 !important;
+}

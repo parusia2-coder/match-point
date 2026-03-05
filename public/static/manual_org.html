@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Match Point 단체(협회) 분양 시스템 가이드</title>
+    <link rel="stylesheet" as="style" crossorigin
+        href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <style>
+        :root {
+            --primary: #8b5cf6;
+            --text-main: #0f172a;
+            --text-sub: #475569;
+            --bg: #f8fafc;
+        }
+
+        body {
+            font-family: 'Pretendard', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #e2e8f0;
+            color: var(--text-main);
+            line-height: 1.6;
+        }
+
+        /* A4 사이즈 화면 및 인쇄 설정 */
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            padding: 20mm;
+            margin: 10mm auto;
+            background: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            box-sizing: border-box;
+            border-radius: 4px;
+        }
+
+        h1 {
+            color: var(--primary);
+            font-size: 28pt;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 800;
+            border-bottom: 4px solid var(--primary);
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #334155;
+            font-size: 20pt;
+            margin-top: 30pt;
+            margin-bottom: 15pt;
+            padding-left: 10px;
+            border-left: 6px solid var(--primary);
+            font-weight: 700;
+        }
+
+        h3 {
+            color: #f97316;
+            font-size: 16pt;
+            margin-top: 20pt;
+            margin-bottom: 10pt;
+            font-weight: 700;
+        }
+
+        p {
+            font-size: 12pt;
+            margin-bottom: 15pt;
+            color: var(--text-sub);
+            word-break: keep-all;
+        }
+
+        ul,
+        ol {
+            font-size: 12pt;
+            margin-bottom: 15pt;
+            color: var(--text-sub);
+            padding-left: 20pt;
+        }
+
+        li {
+            margin-bottom: 8pt;
+        }
+
+        .box {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .box p {
+            margin: 0;
+            color: #334155;
+            font-weight: 600;
+        }
+
+        .image-placeholder {
+            width: 100%;
+            height: 150px;
+            background: #e2e8f0;
+            border: 2px dashed #94a3b8;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+
+        .highlight {
+            background: linear-gradient(120deg, rgba(139, 92, 246, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%);
+            background-repeat: no-repeat;
+            background-size: 100% 40%;
+            background-position: 0 80%;
+            font-weight: bold;
+        }
+
+        .step-number {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 28px;
+            font-size: 14pt;
+            margin-right: 10px;
+            font-weight: bold;
+            vertical-align: middle;
+        }
+
+        @media print {
+            body {
+                background: white;
+                margin: 0;
+            }
+
+            .page {
+                margin: 0;
+                border: initial;
+                border-radius: initial;
+                width: initial;
+                min-height: initial;
+                box-shadow: initial;
+                background: initial;
+                padding: 15mm;
+            }
+
+            .page-break {
+                page-break-after: always;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="no-print" style="text-align: center; padding: 20px; background: #334155; color: white;">
+        <p style="color: white; margin-bottom: 10px;">프린터 아이콘을 누르거나 <b>Ctrl + P (Mac: Cmd + P)</b>를 눌러 A4 용지로 인쇄하세요.</p>
+        <button onclick="window.print()"
+            style="padding: 10px 20px; font-size: 16px; font-weight: bold; background: #f97316; color: white; border: none; border-radius: 8px; cursor: pointer;">🖨️
+            인쇄하기</button>
+    </div>
+
+    <!-- PAGE 1 -->
+    <div class="page page-break">
+        <div style="text-align:center; margin-bottom: 40px;">
+            <span style="font-size: 40px;">🏆</span>
+            <h1>Match Point 단체(협회)<br>전용 홈페이지 세팅 가이드</h1>
+            <p style="font-size: 14pt; color: #64748b; margin-top:-10px;">누구나 따라할 수 있는 <strong>협회/동호회 홈페이지 구축
+                    매뉴얼</strong></p>
+        </div>
+
+        <h2>개요: 단체 분양 시스템이란?</h2>
+        <p>기존에는 대회를 개설하면 누구나 똑같은 화면을 공유해야 했습니다. 하지만 <strong>단체 분양 시스템</strong>을 사용하면 <span class="highlight">우리 협회, 우리
+                동호회만의 독립적인 전용 홈페이지</span>를 가질 수 있습니다.</p>
+
+        <div class="box">
+            <p>💡 <b>도입 시 장점</b></p>
+            <ul>
+                <li>우리 단체만의 고유한 홈페이지 주소를 가질 수 있습니다. (예: minton-tennis.pages.dev/org/<b>anyang</b>)</li>
+                <li>우리 단체를 상징하는 <b>로고와 대표 테마 색상</b>으로 홈페이지가 자동 디자인됩니다.</li>
+                <li>다른 대회와 섞이지 않고, <b>안양에서 개최한 대회 목록만</b> 깔끔하게 모아서 보여줍니다.</li>
+            </ul>
+        </div>
+
+        <h2><span class="step-number">1</span> 관리자 로그인 준비하기</h2>
+        <p>단체를 개설하려면 우선 시스템의 <strong>마스터 관리자 권한</strong>이 있어야 합니다.</p>
+        <ol>
+            <li>Match Point 메인 화면(<span style="color:#2563eb">minton-tennis.pages.dev</span>)에 접속합니다.</li>
+            <li>화면 상단 우측의 <strong>[관리자 접속]</strong> 버튼을 클릭합니다.</li>
+            <li>사전에 발급받은 아이디와 비밀번호를 입력하여 관리자로 로그인합니다.</li>
+            <li>로그인 성공 시, 상단에 <span style="background:#e0e7ff; padding:2px 6px; border-radius:4px; font-size:10pt;">👑
+                    마스터 계정</span> 이라는 표시가 나타납니다.</li>
+        </ol>
+
+        <div style="margin-top:50px;">
+            <p style="text-align:center; color:#94a3b8; font-size:10pt;">- 1 -</p>
+        </div>
+    </div>
+
+    <!-- PAGE 2 -->
+    <div class="page page-break">
+        <h2><span class="step-number">2</span> 내 단체(협회) 개설하기</h2>
+        <p>로그인 후, 스크롤을 조금 내리면 홈 화면 중간에 <strong>[🏛️ 내 단체 (협회/리그)]</strong> 영역이 보입니다. 여기서 설정을 시작합니다.</p>
+
+        <ol>
+            <li>우측 상단의 <strong>[+ 새 단체 개설]</strong> 또는 <strong>[🌟 프리미엄 단체 개설 알아보기]</strong> 보라색 버튼을 클릭합니다.</li>
+            <li>화면에 <strong>[프리미엄 단체 개설]</strong> 입력 창이 나타나면 아래 정보를 채워 넣습니다.
+                <ul style="margin-top:10px;">
+                    <li><strong>🏅 단체 종목:</strong> 배드민턴 🏸 을 선택합니다.</li>
+                    <li><strong>단체 공식 명칭:</strong> 홈페이지 메인에 표시될 이름입니다. <i>(예: <b>안양시 배드민턴 협회</b>)</i></li>
+                    <li><strong>전용 영문 주소 (Slug):</strong> 우리 안양시 협회 홈페이지로 바로 들어올 수 있는 주소입니다. 영문 소문자와 숫자만 사용해 짧게 적어주세요.
+                        <i>(예: <b>anyang</b>)</i>
+                    </li>
+                    <li><strong>브랜드 컬러 설정:</strong> 홈페이지 메인 테마 색상을 클릭해서 안양시 협회의 상징색(예: 남색, 주황색 등)으로 지정합니다.</li>
+                </ul>
+            </li>
+            <li>작성을 마친 뒤 창 하단의 <strong>[설정 완료]</strong> 버튼을 누르면 즉시 새로운 단체 홈페이지가 생성됩니다.</li>
+        </ol>
+
+        <div class="box">
+            <p>⚠️ <b>주의사항: 전용 영문 주소 설정</b></p>
+            <p style="font-size:11pt; font-weight:normal; margin-top:5px;">전용 주소는 한 번 정하면 변경이 어려우며, 다른 단체와 중복될 수 없습니다.
+                소속을 잘 나타내는 간결한 단어(anyang)로 정하는 것을 추천합니다.</p>
+        </div>
+
+        <h2><span class="step-number">3</span> 내 단체 홈페이지 확인하기</h2>
+        <p>개설이 완료되면 홈 화면의 <strong>[🏛️ 내 단체]</strong> 목록에 <b style="color:var(--primary);">안양시 배드민턴 협회</b>가 나타납니다.</p>
+
+        <ol>
+            <li>목록에서 우리 단체 카드 안의 <strong style="color:var(--primary);">[👉 전용 홈 보기]</strong> 버튼을 클릭합니다.</li>
+            <li>새로운 창이 열리며, 설정한 <strong>대표 색상과 타이틀이 적용된 안양시 배드민턴 협회만의 전용 홈페이지</strong>가 나타납s니다.</li>
+            <li>앞으로 동호회원들이나 안양 지역 참가자들에게 기존의 복잡한 주소 대신, 화면 주소창에 적힌 <b>전용 주소(minton-tennis.pages.dev/org/anyang)</b>만
+                복사해서 카카오톡으로 공유하시면 됩니다.</li>
+        </ol>
+
+        <div style="margin-top:50px;">
+            <p style="text-align:center; color:#94a3b8; font-size:10pt;">- 2 -</p>
+        </div>
+    </div>
+
+    <!-- PAGE 3 -->
+    <div class="page">
+        <h2><span class="step-number">4</span> 협회 전용 홈페이지에 대회 올리기</h2>
+        <p>새로 만든 전용 홈페이지에 대회를 노출시키려면, 대회를 개설할 때 우리 단체 이름표를 달아주기만 하면 됩니다.</p>
+
+        <ol>
+            <li>Match Point 메인 홈(관리자 로그인 상태)에서 <strong>[새 대회 개설]</strong> 버튼을 클릭합니다.</li>
+            <li>기존과 동일하게 대회의 이름과 경기 방식을 입력합니다.</li>
+            <li><span class="highlight">입력 폼 위쪽의 [소속 협회 선택]</span> 옵션에서 조금 전 개설한 <strong>우리 단체 이름을 선택</strong>합니다.</li>
+            <li>대회를 최종 개설합니다.</li>
+            <li>다시 우리 전용 홈페이지 주소로 접속해 보면, 방금 만든 대회가 자동으로 등록되어 있는 것을 확인할 수 있습니다.</li>
+        </ol>
+
+        <div class="box">
+            <p>💡 <b>응용: 상위 기관 운영 시</b></p>
+            <p style="font-size:11pt; font-weight:normal; margin-top:5px;">소속 협회를 선택하지 않고 대회를 만들면 "일반 공개 대회"로 설정되어 메인
+                플랫폼에만 노출됩니다. <b>반드시 소속 단체를 선택</b>해야 전용 페이지에 대회가 등록됩니다.</p>
+        </div>
+
+        <h2><span class="step-number">5</span> 요약 및 향후 업데이트 안내</h2>
+        <p>이제 아래의 흐름대로 운영이 가능합니다.</p>
+        <ul style="border-left: 3px solid #cbd5e1; padding-left: 15px; list-style:none;">
+            <li>✅ <b>관리자:</b> 메인에서 로그인 ▶ 대회 생성 시 우리 협회 선택 ▶ 대회 진행</li>
+            <li>✅ <b>참가자:</b> 협회장님이 전달해준 <b>전용 주소로만 접속</b> ▶ 협회 대회만 보고 신청</li>
+        </ul>
+
+        <p style="margin-top: 30px;">
+            <b>🚀 곧 추가될 기능 (업데이트 예정)</b><br>
+            향후 <strong>[⚙️ 설정 관리]</strong> 패널이 열리면, 메인 홈페이지의 메뉴를 내 마음대로 바꾸는 <b>블록형 에디터</b>와 연회비를 관리하는 <b>협회 전속 회원 관리</b>
+            기능이 오픈될 예정입니다!
+        </p>
+
+        <div style="margin-top: 50px; text-align: center; border-top: 2px dashed #cbd5e1; padding-top: 30px;">
+            <p style="font-weight: bold; color: #0f172a; font-size: 14pt;">디지털로 앞서가는 스마트 체육회, Match Point가 함께합니다.</p>
+            <p style="font-size: 11pt; color: #64748b;">(시스템 고객센터 문의: support@minton-tennis.pages.dev)</p>
+        </div>
+
+        <div style="margin-top:50px;">
+            <p style="text-align:center; color:#94a3b8; font-size:10pt;">- 3 -</p>
+        </div>
+    </div>
+
+</body>
+
+</html>

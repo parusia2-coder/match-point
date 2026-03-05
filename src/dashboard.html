@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 대회 현황 대시보드</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Pretendard:wght@400;600;800&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        body {
+            background: #0a0a0f;
+            background-image: radial-gradient(circle at 15% 50%, rgba(200, 255, 0, 0.03), transparent 35%), radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.03), transparent 35%);
+            color: #e8e8ec;
+            font-family: 'Outfit', 'Pretendard', sans-serif;
+            padding: 20px;
+            min-height: 100vh
+        }
+
+        .back {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            padding: 10px 18px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #c0c0cc;
+            font-size: 0.85rem;
+            font-family: inherit;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s
+        }
+
+        .back:hover {
+            background: rgba(200, 255, 0, 0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            color: #C8FF00
+        }
+
+        .hdr {
+            text-align: center;
+            padding: 30px 0 20px
+        }
+
+        .hdr h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            letter-spacing: -1px;
+            background: linear-gradient(135deg, #C8FF00, #38bdf8, #a78bfa);
+            background-size: 200% auto;
+            animation: g 5s linear infinite;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent
+        }
+
+        @keyframes g {
+
+            0%,
+            100% {
+                background-position: 0% 50%
+            }
+
+            50% {
+                background-position: 100% 50%
+            }
+        }
+
+        .hdr .sub {
+            color: #808090;
+            margin-top: 6px;
+            font-weight: 500
+        }
+
+        .spon {
+            max-width: 1200px;
+            margin: 0 auto 28px;
+            padding: 16px;
+            background: rgba(200, 255, 0, 0.05);
+            border: 1px solid rgba(200, 255, 0, 0.1);
+            border-radius: 14px;
+            text-align: center;
+            color: #C8FF00;
+            font-weight: 600;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            transition: opacity 0.3s
+        }
+
+        .sg {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            max-width: 1200px;
+            margin: 0 auto 32px
+        }
+
+        .sc {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 18px;
+            padding: 24px 20px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s
+        }
+
+        .sc:hover {
+            transform: translateY(-4px)
+        }
+
+        .sv {
+            font-size: 2.6rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #C8FF00, #38bdf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1;
+            margin-bottom: 6px
+        }
+
+        .sl {
+            font-size: 0.82rem;
+            color: #808090;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px
+        }
+
+        .pb {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-top: 12px
+        }
+
+        .pf {
+            height: 100%;
+            background: linear-gradient(90deg, #C8FF00, #38bdf8);
+            border-radius: 8px;
+            transition: width 0.8s
+        }
+
+        .sec {
+            max-width: 1200px;
+            margin: 0 auto
+        }
+
+        .sh {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px
+        }
+
+        .st {
+            font-size: 1.4rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 10px
+        }
+
+        .vf {
+            padding: 7px 14px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.04);
+            color: #c0c0cc;
+            font-weight: 600;
+            font-family: inherit;
+            font-size: 0.85rem;
+            cursor: pointer
+        }
+
+        .cg {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin-bottom: 36px
+        }
+
+        .cc {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            transition: all 0.25s;
+            position: relative;
+            overflow: hidden
+        }
+
+        .cc:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3)
+        }
+
+        .cn {
+            font-size: 0.82rem;
+            color: #C8FF00;
+            font-weight: 800;
+            margin-bottom: 10px;
+            letter-spacing: 1.5px;
+            display: inline-block;
+            padding: 3px 10px;
+            background: rgba(200, 255, 0, 0.1);
+            border-radius: 6px
+        }
+
+        .cm {
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 3px
+        }
+
+        .live {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: linear-gradient(135deg, #ea580c, #dc2626);
+            color: #fff;
+            font-size: 0.6rem;
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            animation: p 2s infinite
+        }
+
+        @keyframes p {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: 0.6
+            }
+        }
+
+        .lg {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+            margin-bottom: 36px
+        }
+
+        .lc {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 18px;
+            padding: 22px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2)
+        }
+
+        .lc h3 {
+            font-size: 1.1rem;
+            font-weight: 800;
+            margin-bottom: 4px
+        }
+
+        .lb {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 14px
+        }
+
+        .lb a {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 11px 14px;
+            color: #fff;
+            border-radius: 12px;
+            font-weight: 800;
+            font-size: 0.85rem;
+            text-decoration: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+            transition: transform 0.2s
+        }
+
+        .lb a:hover {
+            transform: translateY(-2px)
+        }
+
+        .cw {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 18px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2)
+        }
+
+        .er {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 20px;
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 12px;
+            margin-bottom: 10px;
+            border-left: 4px solid #C8FF00;
+            cursor: pointer;
+            transition: transform 0.15s, background 0.2s;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15)
+        }
+
+        .er:hover {
+            transform: translateX(6px);
+            background: rgba(200, 255, 0, 0.06);
+            border-left-color: #38bdf8
+        }
+
+        .ed {
+            display: none;
+            margin: -6px 0 10px;
+            padding: 14px 18px;
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 0 0 12px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-top: none;
+            max-height: 260px;
+            overflow-y: auto
+        }
+
+        .ed table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem
+        }
+
+        .ed th {
+            padding: 7px 8px;
+            text-align: left;
+            font-weight: 700;
+            color: #808090;
+            background: rgba(255, 255, 255, 0.04)
+        }
+
+        .ed td {
+            padding: 7px 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06)
+        }
+
+        .rn {
+            text-align: center;
+            color: #606070;
+            font-size: 0.78rem;
+            margin-top: 20px;
+            padding-bottom: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px
+        }
+
+        .rn::before {
+            content: '';
+            width: 7px;
+            height: 7px;
+            background: #C8FF00;
+            border-radius: 50%;
+            animation: bk 2s infinite
+        }
+
+        @keyframes bk {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.4)
+            }
+
+            70% {
+                box-shadow: 0 0 0 6px transparent
+            }
+        }
+
+        @media(max-width:768px) {
+            body {
+                padding: 10px;
+                padding-top: 56px
+            }
+
+            .hdr h1 {
+                font-size: 1.7rem
+            }
+
+            .sc {
+                padding: 18px 14px
+            }
+
+            .sv {
+                font-size: 2rem
+            }
+
+            .cg {
+                grid-template-columns: 1fr
+            }
+
+            .er {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 6px
+            }
+        }
+    </style>
+
+    <link rel="stylesheet" href="/static/style.css?v=20260304c">
+    <link rel="stylesheet" href="/static/theme-override.css?v=20260304c">
+
+    <script>
+        (function () {
+            try {
+                if (localStorage.getItem('mpDarkMode') === 'true' || localStorage.getItem('mp_theme') === 'dark') {
+                    document.documentElement.classList.add('dark-mode');
+                    // also add to body when possible
+                    window.addEventListener('DOMContentLoaded', () => document.body.classList.add('dark-mode'));
+                }
+            } catch (e) { }
+        })();
+    </script>
+
+    <style>
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: var(--transition);
+        }
+
+        .sc,
+        .cc,
+        .lc,
+        .cw,
+        .tc {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border-color: var(--border);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .cc:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--text-primary);
+        }
+
+        .er,
+        .ed th,
+        .st,
+        .rn,
+        .cd {
+            color: var(--text-primary) !important;
+            background: var(--bg-secondary) !important;
+            border-color: var(--border) !important;
+        }
+
+        .ed td {
+            border-bottom: 1px solid var(--border);
+            color: var(--text-muted);
+        }
+
+        .sub,
+        .ls,
+        .ep {
+            color: var(--text-muted);
+        }
+
+        canvas {
+            max-width: 100%;
+        }
+
+        .back {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .back:hover {
+            background: var(--bg-card-hover);
+        }
+
+        /* Reset hard-coded light colors */
+        .sc {
+            background-color: var(--bg-card) !important;
+            color: var(--text-primary) !important;
+            border: 1px solid var(--border) !important;
+            box-shadow: var(--shadow-sm) !important;
+            backdrop-filter: blur(var(--glass-blur)) !important;
+        }
+
+        body.dark-mode .ed th {
+            background: rgba(0, 0, 0, 0.3) !important;
+            color: #fff !important;
+        }
+
+        body.dark-mode .ed td {
+            color: #cbd5e1 !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+        }
+
+        body.dark-mode .er {
+            background: rgba(0, 0, 0, 0.3) !important;
+            color: #fff !important;
+            border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        }
+
+        body.dark-mode .rn {
+            background: none !important;
+            color: #94a3b8 !important;
+            border: none !important;
+        }
+
+        body.dark-mode .st {
+            background: none !important;
+            color: #fff !important;
+        }
+
+        body.dark-mode .cd {
+            background: none !important;
+            color: #e2e8f0 !important;
+        }
+    </style>
+</head>
+
+<body>
+    <button class="back" onclick="location.href='/?tid='+new URLSearchParams(location.search).get('tid')">← 메인
+        메뉴로</button>
+    <div class="hdr">
+        <h1 id="dt">🏸 대회 현황 대시보드</h1>
+        <div class="sub" id="dn"></div>
+    </div>
+    <div class="spon" id="sp">🏆 공식 스폰서: 안양 배드민턴 샵</div>
+    <div class="sg" id="sg">
+        <div style="text-align:center;padding:40px;color:#94a3b8;grid-column:1/-1">로딩중...</div>
+    </div>
+    <div class="sec" style="margin-bottom:36px">
+        <div class="sh">
+            <div class="st">🏟️ 코트 현황</div><select id="vf" class="vf" onchange="L()" style="display:none">
+                <option value="">전체 구장</option>
+            </select>
+        </div>
+        <div class="cg" id="cg"></div>
+    </div>
+    <div class="sec" style="margin-bottom:36px">
+        <div class="st" style="margin-bottom:16px">📺 코트 점수판 / 전광판</div>
+        <div class="lg" id="sl"></div>
+    </div>
+    <div class="sec">
+        <div class="st" style="margin-bottom:16px">📊 종목별 진행률</div>
+        <div class="cw"><canvas id="ch" style="max-height:320px"></canvas></div>
+        <div id="el"></div>
+    </div>
+    <div class="rn">30초마다 자동 갱신됩니다</div>
+    <script>
+        (function () {
+            var tid = new URLSearchParams(location.search).get('tid');
+            if (!tid) {
+                fetch('/api/tournaments').then(function (r) { return r.json() }).then(function (ls) {
+                    document.body.innerHTML = '<div style="max-width:700px;margin:50px auto;padding:0 20px">' +
+                        '<h2 style="font-size:1.6rem;font-weight:800;margin-bottom:20px">📊 라이브 대시보드</h2>' +
+                        '<p style="color:#64748b;margin-bottom:20px">대회를 선택하세요</p>' +
+                        (ls.length === 0 ? '<div style="padding:40px;text-align:center;color:#606070;background:rgba(255,255,255,0.03);border-radius:14px;border:2px dashed rgba(200,255,0,0.15)">진행 중인 대회가 없습니다.</div>' :
+                            ls.map(function (t) {
+                                return '<a href="/dashboard?tid=' + t.id + '" style="display:flex;justify-content:space-between;align-items:center;padding:18px 22px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:14px;margin-bottom:10px;font-weight:700;font-size:1.05rem;text-decoration:none;color:#e8e8ec;box-shadow:0 2px 6px rgba(0,0,0,0.2)">' + (t.sport_type === "tennis" ? "🎾" : "🏸") + ' ' + t.name + '<span style="color:#808090">❯</span></a>';
+                            }).join('')) + '</div>';
+                });
+                return;
+            }
+
+            var CI = null, VL = false, AM = [], EX = null;
+            window.L = L;
+            window.TE = function (id) { EX = EX === id ? null : id; L() };
+
+            async function L() {
+                try {
+                    var vid = (document.getElementById('vf') || {}).value || '';
+                    var cu = '/api/tournaments/' + tid + '/courts/overview' + (vid ? '?venue_id=' + vid : '');
+                    var R = await Promise.all([
+                        fetch('/api/tournaments/' + tid + '/dashboard').then(function (r) { return r.json() }),
+                        fetch(cu).then(function (r) { return r.ok ? r.json() : [] }),
+                        fetch('/api/tournaments/' + tid).then(function (r) { return r.json() }),
+                        fetch('/api/tournaments/' + tid + '/venues').then(function (r) { return r.ok ? r.json() : [] }),
+                        fetch('/api/tournaments/' + tid + '/matches').then(function (r) { return r.ok ? r.json() : [] })
+                    ]);
+                    var d = R[0], cs = R[1], t = R[2], vs = R[3]; AM = R[4] || [];
+                    var iT = t.sport_type === 'tennis', ic = iT ? '🎾 ' : '🏸 ';
+
+                    document.getElementById('dt').textContent = iT ? '🎾 테니스 대시보드' : '🏸 대회 현황 대시보드';
+                    document.getElementById('dn').textContent = t.name || '';
+
+                    if (!VL && vs.length > 0) {
+                        var vf = document.getElementById('vf');
+                        vf.innerHTML = '<option value="">전체 구장</option>' + vs.map(function (v) { return '<option value="' + v.id + '">' + v.name + '</option>' }).join('');
+                        vf.style.display = 'block'; VL = true;
+                    }
+
+                    var o = d.overall || {};
+                    document.getElementById('sg').innerHTML = [
+                        { v: o.total || 0, l: '전체 경기' }, { v: o.completed || 0, l: '완료' }, { v: o.playing || 0, l: '진행중' },
+                        { v: o.pending || 0, l: '대기' }, { v: d.completion_rate + '%', l: '진행률' }
+                    ].map(function (s) { return '<div class="sc"><div class="sv">' + s.v + '</div><div class="sl">' + s.l + '</div></div>' }).join('') +
+                        '<div class="sc"><div class="sl" style="margin-bottom:8px">전체 진행률</div><div class="pb"><div class="pf" style="width:' + d.completion_rate + '%"></div></div></div>';
+
+                    document.getElementById('cg').innerHTML = cs.map(function (c) {
+                        var cur = c.current, nx = c.next_match, b = '';
+                        if (cur) {
+                            b = '<div class="live">LIVE</div><div class="cm">' + ic + (cur.team1_name || '?') + ' vs ' + (cur.team2_name || '?') + '</div><div style="color:#808090;font-size:0.82rem">' + (cur.event_name || '') + '</div>';
+                            if (nx) b += '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(255,255,255,0.08);font-size:0.78rem;color:#808090"><span style="font-weight:700;color:#C8FF00">⏭️ 다음' + (nx.scheduled_time ? ' · 🕐 ' + nx.scheduled_time : '') + '</span><br>' + (nx.team1_name || '미정') + ' vs ' + (nx.team2_name || '미정') + '</div>';
+                        } else if (nx) {
+                            b = (nx.scheduled_time ? '<div style="font-size:1.1rem;font-weight:800;color:#C8FF00;margin-bottom:4px">🕐 ' + nx.scheduled_time + '</div>' : '') +
+                                '<div class="cm" style="font-size:0.95rem">' + ic + (nx.team1_name || '미정') + ' vs ' + (nx.team2_name || '미정') + '</div><div style="color:#808090;font-size:0.82rem">' + (nx.event_name || '') + '</div>';
+                        } else {
+                            b = '<div style="color:#94a3b8;font-style:italic">대기중</div>';
+                        }
+                        var pd = c.pending > 0 ? '<div style="margin-top:8px;display:flex;justify-content:space-between"><span style="font-size:0.72rem;color:#606070;font-weight:600">📋 대기 ' + c.pending + '경기</span><span style="background:rgba(200,255,0,0.1);color:#C8FF00;font-size:0.68rem;font-weight:800;padding:2px 8px;border-radius:6px">' + (c.pending > 5 ? '🔥 밀림' : '정상') + '</span></div>' : '';
+                        return '<div class="cc"><div class="cn">코트 ' + c.court + '</div>' + b + pd + '</div>';
+                    }).join('') || '<div style="color:#94a3b8;text-align:center;padding:30px;grid-column:1/-1">코트 데이터 없음</div>';
+
+                    var vl = vs.length > 0 ? vs : [{ id: '', name: '전체 경기장', courts_count: t.courts || 6 }];
+                    document.getElementById('sl').innerHTML = vl.map(function (v) {
+                        var vp = v.id ? '&venue_id=' + v.id : '';
+                        return '<div class="lc"><h3>' + ic + v.name + '</h3><div style="font-size:0.82rem;color:#808090;margin-bottom:4px">코트 ' + (v.courts_count || t.courts || 6) + '면</div><div class="lb"><a href="/court?tid=' + tid + vp + '" target="_blank" style="background:linear-gradient(135deg,#C8FF00,#a0e000);color:#0A0A0A">📋 코트 점수판</a><a href="/board?tid=' + tid + vp + '" target="_blank" style="background:linear-gradient(135deg,#38bdf8,#6366f1)">📺 대형 전광판</a></div></div>';
+                    }).join('');
+
+                    var ev = d.events || [];
+                    document.getElementById('el').innerHTML = ev.map(function (e) {
+                        var pc = e.total_matches > 0 ? Math.round(e.completed / e.total_matches * 100) : 0;
+                        var op = EX === e.id;
+                        return '<div><div class="er" onclick="TE(' + e.id + ')"><span style="font-weight:600;font-size:1rem">' + (op ? '▼ ' : '▶ ') + e.name + '</span><span style="color:#C8FF00;font-weight:700;background:rgba(200,255,0,0.1);padding:3px 12px;border-radius:16px;font-size:0.85rem">' + e.completed + '/' + e.total_matches + ' (' + pc + '%)</span></div><div class="ed" id="ed_' + e.id + '" style="display:' + (op ? 'block' : 'none') + '">' + (op ? BD(e.id) : '') + '</div></div>';
+                    }).join('');
+                    UC(ev, t);
+                } catch (e) {
+                    console.error('Dashboard:', e);
+                    document.getElementById('sg').innerHTML = '<div style="text-align:center;padding:40px;color:#ef4444;font-weight:700;background:rgba(239,68,68,0.08);border-radius:12px;grid-column:1/-1">대시보드 오류: ' + (e.message || e) + '</div>';
+                }
+            }
+
+            function BD(eid) {
+                var ms = AM.filter(function (m) { return m.event_id === eid });
+                if (!ms.length) return '<div style="color:#94a3b8;text-align:center;padding:12px;font-size:0.82rem">경기 없음</div>';
+                ms.sort(function (a, b) {
+                    if (a.scheduled_time && b.scheduled_time) return a.scheduled_time.localeCompare(b.scheduled_time);
+                    if (a.scheduled_time) return -1; if (b.scheduled_time) return 1;
+                    return a.match_order - b.match_order;
+                });
+                return '<table><thead><tr><th>시간</th><th>코트</th><th>팀1</th><th style="text-align:center">점수</th><th>팀2</th><th style="text-align:center">상태</th></tr></thead><tbody>' +
+                    ms.map(function (m) {
+                        var sc = m.status !== 'pending' ? (m.team1_set1 || 0) + '-' + (m.team2_set1 || 0) : '-';
+                        var st = m.status === 'completed' ? '✅완료' : m.status === 'playing' ? '🔴진행' : '⏳대기';
+                        var stc = m.status === 'completed' ? '#34d399' : m.status === 'playing' ? '#C8FF00' : '#606070';
+                        return '<tr><td style="font-weight:700;color:#C8FF00">' + (m.scheduled_time || '-') + '</td><td>' + (m.court_number || '-') + '</td><td style="font-weight:600">' + (m.team1_name || m.t1p1_name || '미정') + '</td><td style="text-align:center;font-weight:800;font-family:monospace">' + sc + '</td><td style="font-weight:600">' + (m.team2_name || m.t2p1_name || '미정') + '</td><td style="text-align:center;color:' + stc + ';font-weight:700">' + st + '</td></tr>';
+                    }).join('') + '</tbody></table>';
+            }
+
+            function UC(ev, t) {
+                var cx = document.getElementById('ch');
+                if (!cx || !ev.length) return;
+                var lb = ev.map(function (e) { return e.name }), cd = ev.map(function (e) { return e.completed }), rm = ev.map(function (e) { return e.total_matches - e.completed });
+                if (CI) { CI.data.labels = lb; CI.data.datasets[0].data = cd; CI.data.datasets[1].data = rm; CI.update() }
+                else {
+                    Chart.defaults.color = '#808090';
+                    Chart.defaults.font.family = "'Pretendard',sans-serif";
+                    CI = new Chart(cx, {
+                        type: 'bar', data: {
+                            labels: lb, datasets: [
+                                { label: '완료', data: cd, backgroundColor: '#C8FF00', borderRadius: 4 },
+                                { label: '대기/진행중', data: rm, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 4 }
+                            ]
+                        }, options: {
+                            responsive: true, maintainAspectRatio: false, scales: {
+                                x: { stacked: true, grid: { color: 'rgba(255,255,255,0.04)' }, border: { display: false } },
+                                y: { stacked: true, grid: { color: 'rgba(255,255,255,0.06)' }, border: { display: false }, ticks: { stepSize: 1, precision: 0 } }
+                            }, plugins: {
+                                legend: { labels: { color: '#808090', usePointStyle: true, boxWidth: 8 } },
+                                tooltip: { mode: 'index', intersect: false, backgroundColor: 'rgba(15,23,42,0.95)', titleColor: '#fff', bodyColor: '#c0c0cc' }
+                            }
+                        }
+                    });
+                }
+            }
+
+            var sps = ['🏆 공식 스폰서: 안양 배드민턴 샵', '👟 협찬: 프로 스포츠 샵', '🥤 공식 음료: 프리미엄 이온 음료', '🤝 지역 파트너: 체육협의회'], si = 0;
+            setInterval(function () { si = (si + 1) % sps.length; var el = document.getElementById('sp'); if (el) { el.style.opacity = 0; setTimeout(function () { el.textContent = sps[si]; el.style.opacity = 1 }, 300) } }, 5000);
+
+            function WS() {
+                try {
+                    var p = location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    var w = new WebSocket(p + '//' + location.host + '/api/live/' + tid + '/ws');
+                    w.onmessage = function (e) { if (e.data === 'pong') return; try { var d = JSON.parse(e.data); if (d.type === 'update') L() } catch (x) { } };
+                    w.onclose = function () { setTimeout(WS, 5000) };
+                    setInterval(function () { if (w.readyState === WebSocket.OPEN) w.send('ping') }, 30000);
+                } catch (e) { }
+            }
+
+            L(); WS(); setInterval(L, 30000);
+        })();
+    </script>
+</body>
+
+</html>

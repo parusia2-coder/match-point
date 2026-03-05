@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  ${commonHead}
+  <title>🖨️ 인쇄 센터</title>
+  <meta name="description" content="수기 운영 대비 6종 인쇄물">
+  <link rel="stylesheet" href="/static/theme-override.css?v=20260304d">
+  <style>
+    @media print {
+      .no-print {
+        display: none !important;
+      }
+
+      body {
+        background: #fff !important;
+        color: #000 !important;
+      }
+
+      .print-section {
+        page-break-before: always;
+      }
+
+      .print-content {
+        box-shadow: none !important;
+      }
+    }
+
+    body {
+      background: #0a0a0f;
+      color: #e8e8ec;
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+    }
+
+    .print-header {
+      background: linear-gradient(135deg, #1e293b, #334155);
+      color: #fff;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .print-header h1 {
+      font-size: 1.5rem;
+      margin: 0;
+    }
+
+    .menu-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 16px 24px;
+      background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+      justify-content: center;
+    }
+
+    .menu-btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+
+    .menu-btn.active {
+      background: #1e293b;
+      color: #fff;
+      border-color: #1e293b;
+    }
+
+    .menu-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      text-decoration: line-through;
+    }
+
+    .print-content {
+      max-width: 210mm;
+      margin: 20px auto;
+      padding: 20px;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 0.85rem;
+    }
+
+    th,
+    td {
+      border: 1px solid #d1d5db;
+      padding: 6px 8px;
+      text-align: left;
+    }
+
+    th {
+      background: #f1f5f9;
+      font-weight: 600;
+    }
+
+    .section-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin: 24px 0 12px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #1e293b;
+    }
+
+    .group-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #475569;
+      margin: 16px 0 8px;
+    }
+
+    .print-fab {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 12px 24px;
+      background: #1e293b;
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .loading {
+      text-align: center;
+      padding: 60px;
+      color: #9ca3af;
+    }
+
+    .bracket {
+      display: flex;
+      gap: 40px;
+      align-items: flex-start;
+      padding: 20px 0;
+      overflow-x: auto;
+    }
+
+    .bracket-round {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-width: 180px;
+    }
+
+    .bracket-match {
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      overflow: hidden;
+      font-size: 0.8rem;
+    }
+
+    .bracket-team {
+      padding: 6px 8px;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .bracket-team.winner {
+      background: #ecfdf5;
+      font-weight: 600;
+    }
+
+    .bracket-team:last-child {
+      border-bottom: none;
+    }
+
+    .round-label {
+      font-size: 0.75rem;
+      color: #6b7280;
+      text-align: center;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="print-header no-print">
+    <nav style="display:flex; justify-content:flex-start; margin-bottom:12px;">
+      <a href="/" id="homeBtn"
+        style="color:rgba(255,255,255,0.7); text-decoration:none; font-weight:600; font-size:0.9rem; display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.1); padding:6px 14px; border-radius:16px; transition:all 0.2s ease; border:1px solid rgba(255,255,255,0.1);">
+        🛖 메인 홈
+      </a>
+    </nav>
+    <h1>🖨️ 인쇄 센터</h1>
+    <p style="font-size:0.85rem;opacity:0.7;margin:4px 0 0">수기 운영 대비 6종 A4 인쇄물</p>
+  </div>
+  <div class="menu-bar no-print" id="menuBar"></div>
+  <div class="print-content" id="printContent">
+    <div class="loading">데이터를 불러오는 중...</div>
+  </div>
+  <button class="print-fab no-print" onclick="window.print()">🖨️ 인쇄</button>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const tid = params.get('tid') || '1';
+    let printData = null;
+
+    document.getElementById('homeBtn').href = '/?tid=' + tid;
+    const sections = [
+      { id: 'participants', label: '① 참가자 명단', icon: '👥' },
+      { id: 'teams', label: '② 팀 편성표', icon: '👫' },
+      { id: 'matches', label: '③ 조별 대진표', icon: '📋' },
+      { id: 'scoresheet', label: '④ 점수 기록지', icon: '📝' },
+      { id: 'standings', label: '⑤ 순위 집계표', icon: '🏆' },
+      { id: 'finals', label: '⑥ 결선 대진표', icon: '🥇' },
+      { id: 'receipts', label: '⑦ 참가비 영수증', icon: '🧾' },
+      { id: 'referee', label: '⑧ 심판 기록지', icon: '📋' }
+    ];
+    let activeSection = 'participants';
+
+    async function loadPrintData() {
+      const res = await fetch('/api/tournaments/' + tid + '/print-data');
+      printData = await res.json();
+      renderMenu();
+      renderSection();
+    }
+
+    function renderMenu() {
+      var menuBar = document.getElementById('menuBar');
+      menuBar.innerHTML = '';
+      sections.forEach(function (s) {
+        var btn = document.createElement('button');
+        btn.className = 'menu-btn' + (s.id === activeSection ? ' active' : '');
+        btn.textContent = s.icon + ' ' + s.label;
+        btn.addEventListener('click', function () { switchSection(s.id); });
+        menuBar.appendChild(btn);
+      });
+    }
+
+    function switchSection(id) {
+      activeSection = id;
+      renderMenu();
+      renderSection();
+      document.getElementById('printContent').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function renderSection() {
+      const c = document.getElementById('printContent');
+      if (!printData) return;
+      switch (activeSection) {
+        case 'participants': renderParticipants(c); break;
+        case 'teams': renderTeams(c); break;
+        case 'matches': renderMatches(c); break;
+        case 'scoresheet': renderScoresheet(c); break;
+        case 'standings': renderStandings(c); break;
+        case 'finals': renderFinals(c); break;
+        case 'receipts': renderReceipts(c); break;
+        case 'referee': renderRefereeSheet(c); break;
+      }
+    }
+
+    function renderParticipants(c) {
+      let html = '<div class="section-title">👥 참가자 명단</div>';
+      if (!printData.participants || printData.participants.length === 0) {
+        c.innerHTML = html + '<div class="loading">등록된 참가자가 없습니다.</div>';
+        return;
+      }
+      const byClub = {};
+      printData.participants.forEach(function (p) {
+        const club = p.club || '소속없음';
+        if (!byClub[club]) byClub[club] = [];
+        byClub[club].push(p);
+      });
+      for (const [club, members] of Object.entries(byClub)) {
+        html += '<div class="group-title">' + club + ' (' + members.length + '명)</div>';
+        html += '<table><tr><th>이름</th><th>성별</th><th>출생</th><th>급수</th><th>연락처</th><th>참가비</th><th>체크인</th></tr>';
+        members.forEach(function (p) {
+          html += '<tr><td>' + p.name + '</td><td>' + (p.gender === 'm' ? '남' : '여') + '</td><td>' + p.birth_year + '</td><td>' + p.level.toUpperCase() + '</td><td>' + (p.phone || '') + '</td><td style="text-align:center">' + (p.paid ? '✅' : '☐') + '</td><td style="text-align:center">' + (p.checked_in ? '✅' : '☐') + '</td></tr>';
+        });
+        html += '</table>';
+      }
+      c.innerHTML = html;
+    }
+
+    function renderTeams(c) {
+      let html = '<div class="section-title">👫 팀 편성표</div>';
+      if (!printData.teams || printData.teams.length === 0) {
+        c.innerHTML = html + '<div class="loading">등록된 팀이 없습니다.</div>';
+        return;
+      }
+      const byEvent = {};
+      (printData.teams || []).forEach(function (t) {
+        const eid = t.event_id;
+        if (!byEvent[eid]) byEvent[eid] = [];
+        byEvent[eid].push(t);
+      });
+      const events = printData.events || [];
+      events.forEach(function (e) {
+        const teams = byEvent[e.id] || [];
+        if (!teams.length) return;
+        html += '<div class="group-title">' + e.name + ' (' + teams.length + '팀)</div>';
+        html += '<table><tr><th>#</th><th>팀명</th><th>선수1</th><th>급수</th><th>선수2</th><th>급수</th><th>조</th></tr>';
+        teams.forEach(function (t, i) {
+          html += '<tr><td>' + (i + 1) + '</td><td>' + (t.team_name || t.p1_name + ' · ' + t.p2_name) + '</td><td>' + t.p1_name + '</td><td>' + (t.p1_level || '').toUpperCase() + '</td><td>' + t.p2_name + '</td><td>' + (t.p2_level || '').toUpperCase() + '</td><td>' + (t.group_num || '-') + '</td></tr>';
+        });
+        html += '</table>';
+      });
+      c.innerHTML = html;
+    }
+
+    function renderMatches(c) {
+      let html = '<div class="section-title">📋 조별 대진표</div>';
+      const matchesByEvent = {};
+      (printData.matches || []).forEach(function (m) {
+        if (m.round >= 900) return;
+        if (!matchesByEvent[m.event_id]) matchesByEvent[m.event_id] = [];
+        matchesByEvent[m.event_id].push(m);
+      });
+      (printData.events || []).forEach(function (e) {
+        const ms = matchesByEvent[e.id] || [];
+        if (!ms.length) { html += '<div class="group-title">' + e.name + ' (경기 미생성)</div>'; return; }
+        html += '<div class="group-title">' + e.name + '</div>';
+        html += '<table><tr><th>R</th><th>#</th><th>코트</th><th>팀1</th><th>vs</th><th>팀2</th><th>점수</th><th>상태</th></tr>';
+        ms.forEach(function (m) {
+          const t1 = m.team1_name || (m.t1p1_name ? m.t1p1_name + '/' + m.t1p2_name : 'BYE');
+          const t2 = m.team2_name || (m.t2p1_name ? m.t2p1_name + '/' + m.t2p2_name : 'BYE');
+          const score = m.status === 'completed' ? [m.team1_set1, m.team1_set2, m.team1_set3].join('-') + ':' + [m.team2_set1, m.team2_set2, m.team2_set3].join('-') : '';
+          html += '<tr><td>' + m.round + '</td><td>' + m.match_order + '</td><td>' + (m.court_number || '-') + '</td><td>' + t1 + '</td><td>vs</td><td>' + t2 + '</td><td>' + score + '</td><td>' + m.status + '</td></tr>';
+        });
+        html += '</table>';
+      });
+      c.innerHTML = html;
+    }
+
+    function renderScoresheet(c) {
+      var sport = (printData.tournament || {}).sport_type || 'badminton';
+      var isBadminton = sport === 'badminton';
+      var courts = (printData.tournament || {}).courts || 6;
+
+      var titleSub = isBadminton
+        ? '🏸 배드민턴 — 각 게임 21점제 (2점차 승, 30점 캡)'
+        : '🎾 테니스 — 각 세트 6게임 선취 (6-6 타이브레이크)';
+      var html = '<div class="section-title">📝 점수 기록지 <span style="font-size:0.72rem;font-weight:400;color:#64748b;margin-left:6px;">' + titleSub + '</span></div>';
+
+      var scoreH = isBadminton ? '게임' : '세트';
+      var SC = '<th style="width:38px;text-align:center;white-space:nowrap;padding:4px 2px">';
+      var WN = '<th style="width:52px;text-align:center">승팀</th>';
+
+      // colgroup for table-layout:fixed
+      var cg_bad = '<colgroup><col style="width:26px"><col style="width:90px"><col><col style="width:38px"><col style="width:38px"><col style="width:38px"><col><col style="width:38px"><col style="width:38px"><col style="width:38px"><col style="width:52px"></colgroup>';
+      var cg_ten = '<colgroup><col style="width:26px"><col style="width:90px"><col><col style="width:36px"><col style="width:36px"><col style="width:36px"><col><col style="width:36px"><col style="width:36px"><col style="width:36px"><col style="width:32px"><col style="width:48px"></colgroup>';
+
+      var header_bad = cg_bad + '<tr style="background:#f1f5f9"><th style="width:26px;text-align:center">#</th><th style="font-size:0.72rem">종목</th><th>팀 1</th>' + SC + '1' + scoreH + '</th>' + SC + '2' + scoreH + '</th>' + SC + '3' + scoreH + '</th><th>팀 2</th>' + SC + '1' + scoreH + '</th>' + SC + '2' + scoreH + '</th>' + SC + '3' + scoreH + '</th>' + WN + '</tr>';
+      var header_ten = cg_ten + '<tr style="background:#f1f5f9"><th style="width:26px;text-align:center">#</th><th style="font-size:0.72rem">종목</th><th>팀 1</th>' + SC + '1세트</th>' + SC + '2세트</th>' + SC + '3세트</th><th>팀 2</th>' + SC + '1세트</th>' + SC + '2세트</th>' + SC + '3세트</th><th style="width:32px;text-align:center;padding:4px 2px">TB</th><th style="width:48px;text-align:center">승팀</th></tr>';
+
+      var header = isBadminton ? header_bad : header_ten;
+
+      var emptyCell = '<td style="height:32px"> </td>';
+      var scoreCell = '<td style="text-align:center;height:32px"> </td>';
+      var emptyRow_bad = '<tr><td></td><td></td>' + emptyCell + scoreCell + scoreCell + scoreCell + emptyCell + scoreCell + scoreCell + scoreCell + scoreCell + '</tr>';
+      var emptyRow_ten = '<tr><td></td><td></td>' + emptyCell + scoreCell + scoreCell + scoreCell + emptyCell + scoreCell + scoreCell + scoreCell + scoreCell + scoreCell + '</tr>';
+      var emptyRow = isBadminton ? emptyRow_bad : emptyRow_ten;
+
+      var note = isBadminton
+        ? '<p style="font-size:0.72rem;color:#64748b;margin:3px 0 14px 4px">※ 각 게임 21점 선취, 듀스 시 2점차 승(최대 30점) / 2게임 선취 팀 승리</p>'
+        : '<p style="font-size:0.72rem;color:#64748b;margin:3px 0 14px 4px">※ 각 세트 6게임 선취, 6-6 타이브레이크 적용 / 2세트 선취 팀 승리 (TB 점수 기입)</p>';
+
+      for (var court = 1; court <= courts; court++) {
+        html += '<div class="group-title print-section">🏟️ 코트 ' + court + '</div>';
+        html += '<table style="table-layout:fixed;width:100%">' + header;
+        var courtMatches = (printData.matches || []).filter(function (m) { return m.court_number === court && m.round < 900; });
+        if (courtMatches.length === 0) {
+          for (var i = 0; i < 8; i++) { html += emptyRow; }
+        } else {
+          courtMatches.forEach(function (m, idx) {
+            var t1 = m.team1_name || ((m.t1p1_name || '') + (m.t1p2_name ? ' / ' + m.t1p2_name : ''));
+            var t2 = m.team2_name || ((m.t2p1_name || '') + (m.t2p2_name ? ' / ' + m.t2p2_name : ''));
+            var ev = (printData.events || []).find(function (e) { return e.id === m.event_id; });
+            var evName = ev ? ev.name : '';
+            var numCell = '<td style="text-align:center;vertical-align:middle">' + (idx + 1) + '</td>';
+            var evCell = '<td style="font-size:0.68rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle">' + evName + '</td>';
+            var t1Cell = '<td style="font-weight:600;vertical-align:middle;overflow:hidden">' + t1 + '</td>';
+            var t2Cell = '<td style="font-weight:600;vertical-align:middle;overflow:hidden">' + t2 + '</td>';
+            var sc = '<td style="text-align:center;height:34px"> </td>';
+            if (isBadminton) {
+              html += '<tr>' + numCell + evCell + t1Cell + sc + sc + sc + t2Cell + sc + sc + sc + sc + '</tr>';
+            } else {
+              html += '<tr>' + numCell + evCell + t1Cell + sc + sc + sc + t2Cell + sc + sc + sc + sc + sc + '</tr>';
+            }
+          });
+        }
+        html += '</table>' + note;
+      }
+      c.innerHTML = html;
+    }
+
+    function renderStandings(c) {
+      let html = '<div class="section-title">🏆 순위 집계표</div>';
+      const byEvent = {};
+      (printData.standings || []).forEach(function (s) {
+        if (!byEvent[s.event_id]) byEvent[s.event_id] = [];
+        byEvent[s.event_id].push(s);
+      });
+      (printData.events || []).forEach(function (e) {
+        const st = byEvent[e.id] || [];
+        if (!st.length) return;
+        const byGroup = {};
+        st.forEach(function (s) { const g = s.group_num || 0; if (!byGroup[g]) byGroup[g] = []; byGroup[g].push(s); });
+        for (const [gn, items] of Object.entries(byGroup)) {
+          html += '<div class="group-title">' + e.name + (gn > 0 ? ' - ' + gn + '조' : '') + '</div>';
+          html += '<table><tr><th>순위</th><th>팀명</th><th>승</th><th>패</th><th>승점</th><th>득점</th><th>실점</th><th>득실차</th></tr>';
+          items.sort(function (a, b) { return b.points - a.points || b.goal_difference - a.goal_difference || b.score_for - a.score_for; });
+          items.forEach(function (s, i) {
+            html += '<tr><td>' + (i + 1) + '</td><td>' + (s.team_name || (s.p1_name + ' · ' + s.p2_name)) + '</td><td>' + s.wins + '</td><td>' + s.losses + '</td><td>' + s.points + '</td><td>' + s.score_for + '</td><td>' + s.score_against + '</td><td>' + s.goal_difference + '</td></tr>';
+          });
+          html += '</table>';
+        }
+      });
+      c.innerHTML = html || '<div class="loading">순위 데이터가 없습니다</div>';
+    }
+
+    function renderFinals(c) {
+      let html = '<div class="section-title">🥇 결선 대진표</div>';
+      const finalsMatches = (printData.matches || []).filter(function (m) { return m.round >= 900; });
+      if (!finalsMatches.length) { c.innerHTML = html + '<div class="loading">결선 경기가 없습니다</div>'; return; }
+
+      const byEvent = {};
+      finalsMatches.forEach(function (m) { if (!byEvent[m.event_id]) byEvent[m.event_id] = []; byEvent[m.event_id].push(m); });
+
+      for (const [eid, ms] of Object.entries(byEvent)) {
+        const event = (printData.events || []).find(function (e) { return e.id == eid; });
+        html += '<div class="group-title">' + (event ? event.name : 'Event #' + eid) + '</div>';
+        const rounds = [...new Set(ms.map(function (m) { return m.round; }))].sort();
+        html += '<div class="bracket">';
+        rounds.forEach(function (r, ri) {
+          const roundMatches = ms.filter(function (m) { return m.round === r; });
+          const labels = ['1라운드', '2라운드', '준결승', '결승'];
+          html += '<div class="bracket-round"><div class="round-label">' + (labels[ri] || r + '라운드') + '</div>';
+          roundMatches.forEach(function (m) {
+            const t1 = m.team1_name || (m.t1p1_name || 'BYE');
+            const t2 = m.team2_name || (m.t2p1_name || 'BYE');
+            html += '<div class="bracket-match"><div class="bracket-team' + (m.winner_team === 1 ? ' winner' : '') + '"><span>' + t1 + '</span></div>' +
+              '<div class="bracket-team' + (m.winner_team === 2 ? ' winner' : '') + '"><span>' + t2 + '</span></div></div>';
+          });
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+      c.innerHTML = html;
+    }
+
+    function renderReceipts(c) {
+      let html = '<div class="section-title no-print">🧾 참가비 납부 확인증 (영수증)</div>';
+      if (!printData.participants || printData.participants.length === 0) {
+        c.innerHTML = html + '<div class="loading">등록된 참가자가 없어서 영수증을 생성할 수 없습니다.</div>';
+        return;
+      }
+      html += '<div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:20px; page-break-inside: avoid;">';
+      const participants = printData.participants || [];
+      const tName = (printData.tournament || {}).name || '';
+      participants.forEach(function (p) {
+        html += '<div style="border: 2px dashed #cbd5e1; border-radius: 12px; padding: 24px; position: relative; break-inside: avoid; background: #fff;">';
+        html += '<div style="text-align: center; border-bottom: 2px solid #1e293b; padding-bottom: 12px; margin-bottom: 20px;">';
+        html += '  <h2 style="margin:0; font-size:1.4rem; color:#1e293b; letter-spacing: 2px;">참가비 납부 확인증</h2>';
+        html += '  <p style="margin:6px 0 0; font-size:0.95rem; color:#64748b; font-weight: 500;">' + tName + '</p>';
+        html += '</div>';
+
+        html += '<table style="width:100%; border:none; margin:0;">';
+        html += '  <tr><th style="width:80px; background:none; border:none; padding:8px 0; color:#64748b;">성 명</th><td style="border:none; padding:8px 0; font-size:1.15rem; font-weight:800; color:#0f172a;">' + p.name + ' <span style="font-size:0.9rem;font-weight:400;color:#64748b;">(' + (p.gender === 'm' ? '남' : '여') + ')</span></td></tr>';
+        html += '  <tr><th style="background:none; border:none; padding:8px 0; color:#64748b;">소 속</th><td style="border:none; padding:8px 0; font-weight:600;">' + (p.club || '개인 자격') + '</td></tr>';
+        html += '  <tr><th style="background:none; border:none; padding:8px 0; color:#64748b;">참가종목</th><td style="border:none; padding:8px 0;">' + (p.level || '').toUpperCase() + ' 조</td></tr>';
+        html += '  <tr><th style="background:none; border:none; padding:8px 0; color:#64748b;">납부상태</th><td style="border:none; padding:8px 0;">';
+        if (p.paid) {
+          html += '<span style="display:inline-block; padding:4px 12px; background:#ecfdf5; color:#059669; border:1px solid #10b981; border-radius:20px; font-weight:700; font-size:0.9rem;">납부 완료 (정상)</span>';
+        } else {
+          html += '<span style="display:inline-block; padding:4px 12px; background:#fef2f2; color:#dc2626; border:1px solid #ef4444; border-radius:20px; font-weight:700; font-size:0.9rem;">미납 (현장 결제 요망)</span>';
+        }
+        html += '  </td></tr>';
+        html += '</table>';
+
+        html += '<div style="margin-top: 30px; text-align: right; color:#475569; font-size:0.9rem; line-height: 1.5;">';
+        html += '<p style="margin:0 0 10px 0;">위 참가자의 대회 참가 및<br>참가비 납부를 입증합니다.</p>';
+        html += '<h3 style="margin:0; color:#1e293b; display: inline-block; position: relative;">대회 조직위원회 (인)<span style="position:absolute; right:-15px; top:-5px; width:40px;height:40px; border-radius:50%; border:2px solid #ef4444; color:#ef4444; display:flex; align-items:center; justify-content:center; font-size:12px; transform:rotate(-15deg); font-weight:700; opacity:0.8;">승인</span></h3>';
+        html += '</div>';
+
+        if (p.paid) {
+          html += '<div style="position: absolute; top:50%; left:50%; transform: translate(-50%, -50%) rotate(-20deg); font-size: 5rem; font-weight:900; color:rgba(16, 185, 129, 0.08); pointer-events:none; border: 8px solid rgba(16, 185, 129, 0.08); padding: 10px 30px; border-radius: 20px; white-space: nowrap; z-index: 0;">PAID</div>';
+        }
+
+        html += '</div>';
+      });
+      html += '</div>';
+      c.innerHTML = html;
+    }
+
+    function renderRefereeSheet(c) {
+      var sport = (printData.tournament || {}).sport_type || 'badminton';
+      var isBadminton = sport === 'badminton';
+      var tName = (printData.tournament || {}).name || '대회';
+      var matches = (printData.matches || []).filter(function (m) { return m.round < 900; });
+      if (!matches.length) {
+        c.innerHTML = '<div class="section-title">📋 심판 기록지</div><div class="loading">⚠️ 경기가 아직 생성되지 않았습니다.<br>대진표를 먼저 생성하면 매치별 기록지가 여기에 표시됩니다.</div>';
+        return;
+      }
+      var sportIcon = isBadminton ? '🏸' : '🎾';
+      var html = '<div class="section-title">' + sportIcon + ' 심판 점수 기록지 <span style="font-size:0.72rem;font-weight:400;color:#64748b;margin-left:6px;">A4 반면 인쇄 후 각 심판에게 1장씩 배부</span></div>';
+      html += '<p style="font-size:0.75rem;color:#64748b;margin:-4px 0 14px">※ 총 ' + matches.length + '경기 · 인쇄 시 2열씩 출력해 A4 반으로 잘라 사용하세요.</p>';
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+      matches.forEach(function (m) {
+        var ev = (printData.events || []).find(function (e) { return e.id === m.event_id; });
+        var evName = ev ? ev.name : '종목미상';
+        var t1 = m.team1_name || ((m.t1p1_name || '?') + (m.t1p2_name ? ' / ' + m.t1p2_name : ''));
+        var t2 = m.team2_name || ((m.t2p1_name || '?') + (m.t2p2_name ? ' / ' + m.t2p2_name : ''));
+        html += '<div style="border:2px solid #1e293b;border-radius:6px;padding:8px;page-break-inside:avoid;font-size:0.78rem">';
+        html += '<div style="display:flex;justify-content:space-between;background:#1e293b;color:#fff;padding:5px 8px;border-radius:4px;margin-bottom:6px;font-weight:700">';
+        html += '<span>' + sportIcon + ' 심판 점수기록지</span><span>' + tName.substring(0, 15) + '</span>';
+        html += '</div>';
+        html += '<div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:0.72rem;color:#64748b">';
+        html += '<span>코트: <b style="color:#1e293b">' + (m.court_number || '__') + '</b></span>';
+        html += '<span>라운드: <b style="color:#1e293b">R' + m.round + '-' + m.match_order + '</b></span>';
+        html += '<span>종목: <b style="color:#1e293b">' + evName + '</b></span>';
+        html += '</div>';
+        html += '<div style="border:1px solid #e2e8f0;border-radius:4px;padding:5px 8px;margin-bottom:6px;background:#f8fafc">';
+        html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px"><span style="font-size:0.85rem">🔵</span><b style="font-size:0.82rem">' + t1 + '</b></div>';
+        html += '<div style="display:flex;align-items:center;gap:6px"><span style="font-size:0.85rem">🔴</span><b style="font-size:0.82rem">' + t2 + '</b></div>';
+        html += '</div>';
+        if (isBadminton) {
+          [1, 2, 3].forEach(function (g) {
+            html += '<div style="margin-bottom:4px"><div style="font-weight:700;font-size:0.7rem;color:#475569;margin-bottom:2px">' + g + '게임</div>';
+            html += '<table style="width:100%;border-collapse:collapse">';
+            var numRow = '<tr><td style="font-size:0.58rem;padding:1px 2px;color:#94a3b8;width:12px"> </td>';
+            var blueRow = '<tr><td style="font-size:0.58rem;padding:1px 2px;color:#2563eb;font-weight:700">🔵</td>';
+            var redRow = '<tr><td style="font-size:0.58rem;padding:1px 2px;color:#dc2626;font-weight:700">🔴</td>';
+            for (var p = 1; p <= 30; p++) {
+              var bg = p === 21 ? 'background:#fef3c7;' : (p > 21 ? 'background:#fef9c3;' : '');
+              var fw = p <= 21 ? 'font-weight:600;' : 'color:#92400e;';
+              numRow += '<td style="text-align:center;font-size:0.55rem;padding:0;' + bg + fw + '">' + p + '</td>';
+              blueRow += '<td style="border:1px solid #e2e8f0;height:14px;' + bg + '"> </td>';
+              redRow += '<td style="border:1px solid #e2e8f0;height:14px;' + bg + '"> </td>';
+            }
+            html += numRow + '</tr>' + blueRow + '</tr>' + redRow + '</tr></table></div>';
+          });
+          html += '<div style="border-top:1px dashed #cbd5e1;margin-top:5px;padding-top:5px;font-size:0.72rem;display:flex;justify-content:space-between">';
+          html += '<span>결과: 🔵 __G : __G 🔴</span><span>승팀: ___________</span>';
+          html += '</div>';
+          html += '<div style="font-size:0.7rem;color:#64748b;margin-top:3px">심판 서명: _______________________</div>';
+        } else {
+          html += '<table style="width:100%;border-collapse:collapse;font-size:0.72rem;margin-bottom:4px">';
+          html += '<tr style="background:#f1f5f9"><th style="padding:3px;text-align:center">세트</th><th>🔵 ' + t1.substring(0, 8) + '</th><th>🔴 ' + t2.substring(0, 8) + '</th><th>TB(🔵/🔴)</th></tr>';
+          [1, 2, 3].forEach(function (s) {
+            html += '<tr><td style="text-align:center;font-weight:700;padding:6px 3px">' + s + '</td><td style="border:1px solid #e2e8f0;height:22px"> </td><td style="border:1px solid #e2e8f0;height:22px"> </td><td style="border:1px solid #e2e8f0;height:22px;font-size:0.65rem;color:#64748b">  /  </td></tr>';
+          });
+          html += '</table>';
+          html += '<div style="border-top:1px dashed #cbd5e1;padding-top:5px;font-size:0.72rem;display:flex;justify-content:space-between">';
+          html += '<span>결과: 🔵 ___S : ___S 🔴</span><span>승팀: _______</span>';
+          html += '</div>';
+          html += '<div style="font-size:0.7rem;color:#64748b;margin-top:3px">심판 서명: _______________________</div>';
+        }
+        html += '</div>';
+      });
+      html += '</div>';
+      c.innerHTML = html;
+    }
+
+    loadPrintData();
+  </script>
+</body>
+
+</html>

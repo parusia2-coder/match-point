@@ -1,0 +1,59 @@
+{
+    "name": "Match Point — 스포츠 대회 운영",
+    "short_name": "Match Point",
+    "description": "배드민턴·테니스 대회를 스마트하게 운영하세요",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0f172a",
+    "theme_color": "#f97316",
+    "orientation": "portrait-primary",
+    "lang": "ko",
+    "icons": [
+        {
+            "src": "/static/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable any"
+        },
+        {
+            "src": "/static/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable any"
+        },
+        {
+            "src": "/static/icons/icon-1024.png",
+            "sizes": "1024x1024",
+            "type": "image/png",
+            "purpose": "any"
+        }
+    ],
+    "screenshots": [
+        {
+            "src": "/static/og-image.png",
+            "sizes": "1200x630",
+            "type": "image/png",
+            "form_factor": "wide",
+            "label": "대회 운영 홈 화면"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "내 대회 목록",
+            "short_name": "대회",
+            "description": "내가 운영 중인 대회 목록",
+            "url": "/"
+        },
+        {
+            "name": "🏅 랭킹",
+            "short_name": "랭킹",
+            "description": "개인 랭킹 조회",
+            "url": "/?tab=ranking"
+        }
+    ],
+    "categories": [
+        "sports",
+        "productivity"
+    ],
+    "prefer_related_applications": false
+}

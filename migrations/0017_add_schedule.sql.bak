@@ -1,0 +1,6 @@
+-- 대회 시간 스케줄링 기능 추가
+-- tournaments 테이블에 스케줄 설정 JSON 컬럼 추가
+ALTER TABLE tournaments ADD COLUMN schedule_config TEXT DEFAULT NULL;
+
+-- matches 테이블에 예정 시간 컬럼 추가
+ALTER TABLE matches ADD COLUMN scheduled_time TEXT DEFAULT NULL;
