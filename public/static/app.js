@@ -629,10 +629,13 @@ async function renderRoleDashboard(container, user) {
         <div style="border-top:1px solid rgba(255,255,255,0.06); padding-top:16px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
           <button style="background:rgba(255,255,255,0.04); color:#C8FF00; border:1px solid rgba(255,255,255,0.08); padding:9px 8px; border-radius:8px; font-family:'Inter',sans-serif; font-weight:600; font-size:0.78rem; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); manageOrg('${o.id}')" onmouseover="this.style.background='rgba(200,255,0,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">⚙️ 설정</button>
           <button style="background:rgba(255,255,255,0.04); color:#a78bfa; border:1px solid rgba(255,255,255,0.08); padding:9px 8px; border-radius:8px; font-family:'Inter',sans-serif; font-weight:600; font-size:0.78rem; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); manageOrgMembers('${o.id}')" onmouseover="this.style.background='rgba(167,139,250,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">👥 회원</button>
-          <button style="background:rgba(255,255,255,0.04); color:#34d399; border:1px solid rgba(255,255,255,0.08); padding:9px 8px; border-radius:8px; font-family:'Inter',sans-serif; font-weight:600; font-size:0.78rem; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); manageOrgDues('${o.id}')" onmouseover="this.style.background='rgba(52,211,153,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">💳 회비결제</button>
-          <button style="background:rgba(255,255,255,0.04); color:#fbbf24; border:1px solid rgba(255,255,255,0.08); padding:9px 8px; border-radius:8px; font-family:'Inter',sans-serif; font-weight:600; font-size:0.78rem; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); manageOrgSchedules('${o.id}')" onmouseover="this.style.background='rgba(251,191,36,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">📅 일정관리</button>
+          <button style="background:rgba(255,255,255,0.04); color:#34d399; border:1px solid rgba(255,255,255,0.08); padding:9px 8px; border-radius:8px; font-family:'Inter',sans-serif; font-weight:600; font-size:0.78rem; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); manageOrgDues('${o.id}')" onmouseover="this.style.background='rgba(52,211,153,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">💳 회비</button>
+          <button style="background:rgba(255,255,255,0.04); color:#fbbf24; border:1px solid rgba(255,255,255,0.08); padding:9px 8px; border-radius:8px; font-family:'Inter',sans-serif; font-weight:600; font-size:0.78rem; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); manageOrgSchedules('${o.id}')" onmouseover="this.style.background='rgba(251,191,36,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">📅 일정</button>
           <button style="background:rgba(255,255,255,0.04); color:#38bdf8; border:1px solid rgba(255,255,255,0.08); padding:9px 8px; border-radius:8px; font-family:'Inter',sans-serif; font-weight:600; font-size:0.78rem; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); manageOrgBoards('${o.id}')" onmouseover="this.style.background='rgba(56,189,248,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">📋 게시판</button>
-          <button style="background:rgba(255,255,255,0.04); color:#f472b6; border:1px solid rgba(255,255,255,0.08); padding:9px 8px; border-radius:8px; font-family:'Inter',sans-serif; font-weight:600; font-size:0.78rem; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); manageOrgInventory('${o.id}')" onmouseover="this.style.background='rgba(244,114,182,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">📦 재고관리</button>
+          <button style="background:rgba(255,255,255,0.04); color:#f472b6; border:1px solid rgba(255,255,255,0.08); padding:9px 8px; border-radius:8px; font-family:'Inter',sans-serif; font-weight:600; font-size:0.78rem; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); manageOrgInventory('${o.id}')" onmouseover="this.style.background='rgba(244,114,182,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">📦 재고</button>
+          <button style="background:rgba(255,255,255,0.04); color:#fb923c; border:1px solid rgba(255,255,255,0.08); padding:9px 8px; border-radius:8px; font-family:'Inter',sans-serif; font-weight:600; font-size:0.78rem; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); showOrgCalendarView('${o.id}')" onmouseover="this.style.background='rgba(251,146,60,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">🗓️ 달력</button>
+          <button style="background:rgba(255,255,255,0.04); color:#4ade80; border:1px solid rgba(255,255,255,0.08); padding:9px 8px; border-radius:8px; font-family:'Inter',sans-serif; font-weight:600; font-size:0.78rem; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); showOrgDashboard('${o.id}')" onmouseover="this.style.background='rgba(74,222,128,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">📊 통계</button>
+          <button style="background:rgba(255,255,255,0.04); color:#fde047; border:1px solid rgba(255,255,255,0.08); padding:9px 8px; border-radius:8px; font-family:'Inter',sans-serif; font-weight:600; font-size:0.78rem; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); showOrgMatchRecords('${o.id}')" onmouseover="this.style.background='rgba(253,224,71,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">🏆 경기기록</button>
         </div>
         <button style="width:100%; margin-top:10px; background:linear-gradient(135deg,#C8FF00,#a0e000); color:#0A0A0A; border:none; padding:10px; border-radius:8px; font-family:'Inter',sans-serif; font-weight:800; font-size:0.85rem; cursor:pointer; transition:all 0.2s;" onclick="event.stopPropagation(); window.open('/org/${o.slug}', '_blank')" onmouseover="this.style.boxShadow='0 4px 20px rgba(200,255,0,0.25)';this.style.transform='translateY(-1px)'" onmouseout="this.style.boxShadow='';this.style.transform=''">👉 전용 홈 보기</button>
       </div>`;
@@ -2473,6 +2476,269 @@ async function showOrgAttendanceStats(orgId) {
     showToast('통계 데이터를 불러오지 못했습니다.', 'error');
   }
 }
+
+// ===== 📊 출석 통계 대시보드 =====
+async function showOrgDashboard(orgId) {
+  try {
+    const [monthly, quarterly, individual, ranking] = await Promise.all([
+      apiFetch('/api/orgs', '/' + orgId + '/attendance-stats?type=monthly'),
+      apiFetch('/api/orgs', '/' + orgId + '/attendance-stats?type=quarterly'),
+      apiFetch('/api/orgs', '/' + orgId + '/attendance-stats?type=individual'),
+      apiFetch('/api/orgs', '/' + orgId + '/attendance-stats?type=ranking')
+    ]);
+
+    const totalSched = individual.total_schedules || 0;
+    const posLabels = { president: '회장', vice_president: '부회장', secretary: '총무', auditor: '감사', director: '이사', manager: '매니저' };
+    const maxMonthly = Math.max(...monthly.map(m => m.attend_count), 1);
+
+    showModal('📊 출석 통계 대시보드', `
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <!-- 월별 출석 추이 -->
+        <div style="background:var(--bg-card); padding:16px; border-radius:12px; border:1px solid var(--border);">
+          <h3 style="margin:0 0 12px; font-size:1rem;">📈 월별 출석 연인원</h3>
+          <div style="display:flex; flex-direction:column; gap:6px; max-height:200px; overflow-y:auto;">
+            ${monthly.reverse().map(m => {
+      const pct = Math.round((m.attend_count / maxMonthly) * 100);
+      return '<div style="display:flex; align-items:center; gap:8px;"><div style="width:60px; font-size:0.82rem; font-weight:700; color:var(--text-muted);">' + m.month + '</div><div style="flex:1; background:rgba(249,115,22,0.1); height:20px; border-radius:6px; overflow:hidden;"><div style="background:linear-gradient(90deg,#f97316,#fb923c); height:100%; width:' + pct + '%; border-radius:6px; transition:width 0.3s;"></div></div><div style="width:40px; text-align:right; font-size:0.85rem; font-weight:700; color:#f97316;">' + m.attend_count + '</div></div>';
+    }).join('')}
+            ${monthly.length === 0 ? '<div style="color:var(--text-muted); padding:20px; text-align:center;">데이터 없음</div>' : ''}
+          </div>
+        </div>
+
+        <!-- 분기별 통계 -->
+        <div style="background:var(--bg-card); padding:16px; border-radius:12px; border:1px solid var(--border);">
+          <h3 style="margin:0 0 12px; font-size:1rem;">📅 분기별 통계</h3>
+          <table class="table" style="width:100%; font-size:0.85rem;">
+            <thead><tr><th style="padding:6px;">분기</th><th style="padding:6px;">행사 수</th><th style="padding:6px;">총 출석</th><th style="padding:6px;">인당 평균</th></tr></thead>
+            <tbody>
+              ${quarterly.map(q => {
+      const avg = q.event_count > 0 ? (q.attend_count / q.event_count).toFixed(1) : '-';
+      return '<tr style="border-bottom:1px solid var(--border);"><td style="padding:6px; font-weight:700;">' + q.quarter + '</td><td style="padding:6px;">' + q.event_count + '회</td><td style="padding:6px; color:#f97316; font-weight:700;">' + q.attend_count + '명</td><td style="padding:6px;">' + avg + '명/회</td></tr>';
+    }).join('')}
+              ${quarterly.length === 0 ? '<tr><td colspan="4" style="padding:20px; text-align:center; color:var(--text-muted);">데이터 없음</td></tr>' : ''}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 개인별 출석률 -->
+        <div style="background:var(--bg-card); padding:16px; border-radius:12px; border:1px solid var(--border); grid-column:1/-1;">
+          <h3 style="margin:0 0 12px; font-size:1rem;">👤 개인별 출석률 (전체 ${totalSched}회 기준)</h3>
+          <div style="max-height:250px; overflow-y:auto;">
+            <table class="table" style="width:100%; font-size:0.85rem;">
+              <thead style="position:sticky; top:0; background:var(--bg-card);"><tr><th style="padding:6px;">순위</th><th style="padding:6px;">이름</th><th style="padding:6px;">소속</th><th style="padding:6px;">직위</th><th style="padding:6px;">출석</th><th style="padding:6px;">출석률</th><th style="padding:6px;">그래프</th></tr></thead>
+              <tbody>
+                ${(individual.members || []).map((m, i) => {
+      const rate = totalSched > 0 ? Math.round((m.attend_count / totalSched) * 100) : 0;
+      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+      const pos = posLabels[m.position] || '';
+      const barColor = rate >= 80 ? '#10b981' : rate >= 50 ? '#f97316' : '#ef4444';
+      return '<tr style="border-bottom:1px solid var(--border);"><td style="padding:6px; text-align:center;">' + medal + '</td><td style="padding:6px; font-weight:700;">' + m.name + '</td><td style="padding:6px; font-size:0.8rem; color:var(--text-muted);">' + (m.affiliated_club || '-') + '</td><td style="padding:6px; font-size:0.8rem;">' + pos + '</td><td style="padding:6px; text-align:center; font-weight:700; color:#f97316;">' + m.attend_count + '/' + totalSched + '</td><td style="padding:6px; text-align:center; font-weight:700; color:' + barColor + ';">' + rate + '%</td><td style="padding:6px; width:100px;"><div style="background:rgba(255,255,255,0.05); height:12px; border-radius:6px; overflow:hidden;"><div style="background:' + barColor + '; height:100%; width:' + rate + '%;"></div></div></td></tr>';
+    }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `, null, { hideConfirm: true, wide: true });
+  } catch (e) { showToast('통계를 불러오지 못했습니다.', 'error'); }
+}
+
+// ===== 🗓️ 캘린더 뷰 =====
+async function showOrgCalendarView(orgId, year, month) {
+  const now = new Date();
+  year = year || now.getFullYear();
+  month = month || (now.getMonth() + 1);
+
+  try {
+    const data = await apiFetch('/api/orgs', '/' + orgId + '/calendar?year=' + year + '&month=' + month);
+    const schedules = data.schedules || [];
+
+    // 달력 계산
+    const firstDay = new Date(year, month - 1, 1).getDay(); // 0=일
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const todayStr = now.toISOString().substring(0, 10);
+    const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+    const typeColors = { regular: '#f97316', meeting: '#8b5cf6', training: '#10b981', tournament_prep: '#3b82f6', etc: '#6b7280' };
+
+    // 일정을 날짜별로 그룹핑
+    const schedByDate = {};
+    schedules.forEach(s => {
+      const d = s.start_time.substring(0, 10);
+      if (!schedByDate[d]) schedByDate[d] = [];
+      schedByDate[d].push(s);
+    });
+
+    let calendarHtml = '<div style="display:grid; grid-template-columns:repeat(7,1fr); gap:2px; text-align:center;">';
+    // 요일 헤더
+    dayNames.forEach((d, i) => {
+      const color = i === 0 ? '#ef4444' : i === 6 ? '#3b82f6' : 'var(--text-muted)';
+      calendarHtml += '<div style="padding:8px; font-weight:700; font-size:0.85rem; color:' + color + ';">' + d + '</div>';
+    });
+    // 빈 칸
+    for (let i = 0; i < firstDay; i++) calendarHtml += '<div style="padding:4px;"></div>';
+    // 날짜
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = year + '-' + String(month).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      const isToday = dateStr === todayStr;
+      const events = schedByDate[dateStr] || [];
+      const dayOfWeek = new Date(year, month - 1, d).getDay();
+      const numColor = dayOfWeek === 0 ? '#ef4444' : dayOfWeek === 6 ? '#3b82f6' : 'var(--text-primary)';
+
+      calendarHtml += '<div style="padding:4px; min-height:70px; border:1px solid ' + (isToday ? '#f97316' : 'var(--border)') + '; border-radius:8px; background:' + (isToday ? 'rgba(249,115,22,0.08)' : 'var(--bg-card)') + '; cursor:pointer;" onclick="showCalendarDayDetail(' + orgId + ',\'' + dateStr + '\')">';
+      calendarHtml += '<div style="font-size:0.85rem; font-weight:' + (isToday ? '800' : '600') + '; color:' + numColor + '; margin-bottom:2px;">' + d + '</div>';
+      events.forEach(ev => {
+        const c = typeColors[ev.event_type] || '#6b7280';
+        const time = new Date(ev.start_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+        calendarHtml += '<div style="font-size:0.65rem; background:' + c + '22; color:' + c + '; padding:1px 3px; border-radius:3px; margin-bottom:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border-left:2px solid ' + c + ';">' + time + ' ' + ev.title + '</div>';
+      });
+      calendarHtml += '</div>';
+    }
+    calendarHtml += '</div>';
+
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevYear = month === 1 ? year - 1 : year;
+    const nextMonth = month === 12 ? 1 : month + 1;
+    const nextYear = month === 12 ? year + 1 : year;
+
+    showModal('🗓️ ' + year + '년 ' + month + '월 일정 달력', `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <button class="btn btn-sm" onclick="showOrgCalendarView(${orgId},${prevYear},${prevMonth})">◀ ${prevYear}년 ${prevMonth}월</button>
+        <h2 style="margin:0; font-size:1.3rem; font-weight:800;">${year}년 ${month}월</h2>
+        <button class="btn btn-sm" onclick="showOrgCalendarView(${orgId},${nextYear},${nextMonth})">${nextYear}년 ${nextMonth}월 ▶</button>
+      </div>
+      <div style="margin-bottom:8px; display:flex; gap:12px; font-size:0.75rem; color:var(--text-muted); flex-wrap:wrap;">
+        <span><span style="display:inline-block;width:12px;height:12px;background:#f97316;border-radius:50%;vertical-align:middle;"></span> 정기모임</span>
+        <span><span style="display:inline-block;width:12px;height:12px;background:#8b5cf6;border-radius:50%;vertical-align:middle;"></span> 회의</span>
+        <span><span style="display:inline-block;width:12px;height:12px;background:#10b981;border-radius:50%;vertical-align:middle;"></span> 훈련</span>
+        <span><span style="display:inline-block;width:12px;height:12px;background:#3b82f6;border-radius:50%;vertical-align:middle;"></span> 대회준비</span>
+      </div>
+      ${calendarHtml}
+      <div style="margin-top:12px; text-align:center; font-size:0.85rem; color:var(--text-muted);">
+        이번 달 일정 <b style="color:#f97316;">${schedules.length}</b>건 | 총 출석 <b style="color:#10b981;">${schedules.reduce((a, s) => a + (s.attend_count || 0), 0)}</b>명
+      </div>
+    `, null, { hideConfirm: true, wide: true });
+  } catch (e) { showToast('캘린더를 불러오지 못했습니다.', 'error'); }
+}
+
+window.showCalendarDayDetail = function (orgId, dateStr) {
+  // 해당 날짜 일정 상세 (간단히 alert)
+  const schedules = window._calendarSchedules || [];
+  showToast(dateStr + ' 선택됨 (일정관리에서 상세보기)', 'info');
+};
+
+// ===== 🏆 내부 경기 기록 =====
+async function showOrgMatchRecords(orgId) {
+  try {
+    const records = await apiFetch('/api/orgs', '/' + orgId + '/match-records');
+
+    // 승패 통계 계산
+    const playerStats = {};
+    records.forEach(r => {
+      const w1 = r.player1_score > r.player2_score;
+      // Player 1 (or team1)
+      const p1 = r.match_type === 'doubles' ? r.player1_name + '/' + (r.player3_name || '') : r.player1_name;
+      const p2 = r.match_type === 'doubles' ? r.player2_name + '/' + (r.player4_name || '') : r.player2_name;
+      if (!playerStats[p1]) playerStats[p1] = { wins: 0, losses: 0, draws: 0 };
+      if (!playerStats[p2]) playerStats[p2] = { wins: 0, losses: 0, draws: 0 };
+      if (r.player1_score === r.player2_score) { playerStats[p1].draws++; playerStats[p2].draws++; }
+      else if (w1) { playerStats[p1].wins++; playerStats[p2].losses++; }
+      else { playerStats[p2].wins++; playerStats[p1].losses++; }
+    });
+
+    const statsArr = Object.entries(playerStats).map(([name, s]) => ({ name, ...s, total: s.wins + s.losses + s.draws, rate: s.wins + s.losses + s.draws > 0 ? Math.round(s.wins / (s.wins + s.losses + s.draws) * 100) : 0 })).sort((a, b) => b.rate - a.rate || b.wins - a.wins);
+
+    showModal('🏆 내부 경기 기록 & 랭킹', `
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <!-- 랭킹 -->
+        <div style="background:var(--bg-card); padding:16px; border-radius:12px; border:1px solid var(--border);">
+          <h3 style="margin:0 0 12px; font-size:1rem;">🏅 승률 랭킹</h3>
+          <div style="max-height:250px; overflow-y:auto;">
+            <table class="table" style="width:100%; font-size:0.85rem;">
+              <thead><tr><th style="padding:6px;">#</th><th style="padding:6px;">선수</th><th style="padding:6px;">승</th><th style="padding:6px;">패</th><th style="padding:6px;">승률</th></tr></thead>
+              <tbody>
+                ${statsArr.map((s, i) => {
+      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+      const rateColor = s.rate >= 70 ? '#10b981' : s.rate >= 40 ? '#f97316' : '#ef4444';
+      return '<tr style="border-bottom:1px solid var(--border);"><td style="padding:6px; text-align:center;">' + medal + '</td><td style="padding:6px; font-weight:700;">' + s.name + '</td><td style="padding:6px; color:#10b981; font-weight:700;">' + s.wins + '</td><td style="padding:6px; color:#ef4444;">' + s.losses + '</td><td style="padding:6px; font-weight:700; color:' + rateColor + ';">' + s.rate + '%</td></tr>';
+    }).join('')}
+                ${statsArr.length === 0 ? '<tr><td colspan="5" style="padding:20px; text-align:center; color:var(--text-muted);">경기 기록이 없습니다.</td></tr>' : ''}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 최근 기록 -->
+        <div style="background:var(--bg-card); padding:16px; border-radius:12px; border:1px solid var(--border);">
+          <h3 style="margin:0 0 12px; font-size:1rem;">📋 최근 경기 (${records.length}건)</h3>
+          <div style="max-height:250px; overflow-y:auto;">
+            ${records.slice(0, 30).map(r => {
+      const isP1Win = r.player1_score > r.player2_score;
+      const typeLabel = r.match_type === 'doubles' ? '복식' : '단식';
+      const p1 = r.match_type === 'doubles' ? r.player1_name + '/' + (r.player3_name || '?') : r.player1_name;
+      const p2 = r.match_type === 'doubles' ? r.player2_name + '/' + (r.player4_name || '?') : r.player2_name;
+      return '<div style="padding:8px; border-bottom:1px solid var(--border); font-size:0.82rem;"><div style="display:flex; justify-content:space-between; align-items:center;"><span style="font-size:0.75rem; color:var(--text-muted);">' + (r.match_date || '').substring(0, 10) + ' · ' + typeLabel + '</span><button class="btn btn-sm" style="padding:2px 6px; font-size:0.7rem; background:rgba(239,68,68,0.1); color:#ef4444;" onclick="deleteMatchRecord(' + orgId + ',' + r.id + ')">✕</button></div><div style="margin-top:4px;"><span style="font-weight:' + (isP1Win ? '800' : '400') + '; color:' + (isP1Win ? '#10b981' : 'var(--text-primary)') + ';">' + p1 + '</span> <b style="color:#f97316;">' + r.player1_score + '</b> vs <b style="color:#f97316;">' + r.player2_score + '</b> <span style="font-weight:' + (!isP1Win ? '800' : '400') + '; color:' + (!isP1Win ? '#10b981' : 'var(--text-primary)') + ';">' + p2 + '</span></div>' + (r.notes ? '<div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">📝 ' + r.notes + '</div>' : '') + '</div>';
+    }).join('')}
+            ${records.length === 0 ? '<div style="padding:30px; text-align:center; color:var(--text-muted);">기록이 없습니다.</div>' : ''}
+          </div>
+        </div>
+      </div>
+
+      <!-- 경기 등록 -->
+      <div style="background:linear-gradient(135deg,#161616,#111); border:1px solid #2A2A2A; border-radius:12px; padding:16px; margin-top:16px;">
+        <h4 style="margin:0 0 12px; font-size:1rem; color:#fff;">🏆 경기 결과 등록</h4>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+          <div class="form-group" style="margin:0;"><label>날짜</label><input type="date" id="mrDate" class="form-control" value="${new Date().toISOString().substring(0, 10)}"></div>
+          <div class="form-group" style="margin:0;"><label>경기유형</label><select id="mrType" class="form-control" onchange="toggleDoublesFields()"><option value="singles">단식</option><option value="doubles">복식</option></select></div>
+          <div class="form-group" style="margin:0;"><label>메모</label><input type="text" id="mrNotes" class="form-control" placeholder="선택사항"></div>
+          <div class="form-group" style="margin:0;"><label>선수/팀 A</label><input type="text" id="mrP1Name" class="form-control" placeholder="이름"></div>
+          <div class="form-group" style="margin:0;"><label>A 점수</label><input type="number" id="mrP1Score" class="form-control" value="0"></div>
+          <div class="form-group" id="mrP3Group" style="margin:0; display:none;"><label>A 파트너</label><input type="text" id="mrP3Name" class="form-control" placeholder="복식 파트너"></div>
+          <div class="form-group" style="margin:0;"><label>선수/팀 B</label><input type="text" id="mrP2Name" class="form-control" placeholder="이름"></div>
+          <div class="form-group" style="margin:0;"><label>B 점수</label><input type="number" id="mrP2Score" class="form-control" value="0"></div>
+          <div class="form-group" id="mrP4Group" style="margin:0; display:none;"><label>B 파트너</label><input type="text" id="mrP4Name" class="form-control" placeholder="복식 파트너"></div>
+        </div>
+        <button class="btn btn-primary" style="margin-top:12px; width:100%; background:linear-gradient(135deg,#f97316,#ea580c); border:none; font-weight:800;" onclick="submitMatchRecord(${orgId})">🏆 경기 결과 저장</button>
+      </div>
+    `, null, { hideConfirm: true, wide: true });
+  } catch (e) { showToast('경기 기록을 불러오지 못했습니다.', 'error'); }
+}
+
+window.toggleDoublesFields = function () {
+  const isDoubles = document.getElementById('mrType').value === 'doubles';
+  document.getElementById('mrP3Group').style.display = isDoubles ? 'block' : 'none';
+  document.getElementById('mrP4Group').style.display = isDoubles ? 'block' : 'none';
+};
+
+window.submitMatchRecord = async function (orgId) {
+  const p1 = document.getElementById('mrP1Name').value.trim();
+  const p2 = document.getElementById('mrP2Name').value.trim();
+  if (!p1 || !p2) return showToast('선수 이름을 입력하세요.', 'error');
+  try {
+    await apiFetch('/api/orgs', '/' + orgId + '/match-records', {
+      method: 'POST', body: {
+        match_date: document.getElementById('mrDate').value,
+        match_type: document.getElementById('mrType').value,
+        player1_name: p1, player2_name: p2,
+        player1_score: parseInt(document.getElementById('mrP1Score').value) || 0,
+        player2_score: parseInt(document.getElementById('mrP2Score').value) || 0,
+        player3_name: document.getElementById('mrP3Name')?.value?.trim() || null,
+        player4_name: document.getElementById('mrP4Name')?.value?.trim() || null,
+        notes: document.getElementById('mrNotes').value.trim()
+      }
+    });
+    showToast('경기 결과가 저장되었습니다.', 'success');
+    showOrgMatchRecords(orgId);
+  } catch (e) { showToast(e.message, 'error'); }
+};
+
+window.deleteMatchRecord = async function (orgId, recordId) {
+  if (!confirm('이 경기 기록을 삭제하시겠습니까?')) return;
+  try {
+    await apiFetch('/api/orgs', '/' + orgId + '/match-records/' + recordId, { method: 'DELETE' });
+    showToast('삭제 완료', 'success');
+    showOrgMatchRecords(orgId);
+  } catch (e) { showToast(e.message, 'error'); }
+};
 
 
 // ===== Organization Bulletin Boards (게시판) =====

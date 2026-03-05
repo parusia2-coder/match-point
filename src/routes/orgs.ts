@@ -1192,6 +1192,42 @@ orgs.get('/:id/attendance-stats', requireAuth, async (c) => {
                 LIMIT 12
             `).bind(orgId).all()
             return c.json(results || [])
+        } else if (type === 'quarterly') {
+            // 분기별 통계
+            const { results } = await c.env.DB.prepare(`
+                SELECT 
+                    CASE 
+                        WHEN CAST(strftime('%m', s.start_time) AS INTEGER) BETWEEN 1 AND 3 THEN strftime('%Y', s.start_time) || '-Q1'
+                        WHEN CAST(strftime('%m', s.start_time) AS INTEGER) BETWEEN 4 AND 6 THEN strftime('%Y', s.start_time) || '-Q2'
+                        WHEN CAST(strftime('%m', s.start_time) AS INTEGER) BETWEEN 7 AND 9 THEN strftime('%Y', s.start_time) || '-Q3'
+                        ELSE strftime('%Y', s.start_time) || '-Q4'
+                    END as quarter,
+                    count(DISTINCT s.id) as event_count,
+                    count(sa.id) as attend_count
+                FROM schedules s
+                LEFT JOIN schedule_attendances sa ON s.id = sa.schedule_id AND sa.status = 'present'
+                WHERE s.org_id = ?
+                GROUP BY quarter
+                ORDER BY quarter DESC
+                LIMIT 8
+            `).bind(orgId).all()
+            return c.json(results || [])
+        } else if (type === 'individual') {
+            // 개인별 출석률 (전체 일정 대비)
+            const totalSchedules = await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM schedules WHERE org_id = ?').bind(orgId).first() as any
+            const total = totalSchedules?.cnt || 0
+            const { results } = await c.env.DB.prepare(`
+                SELECT m.id, m.name, om.affiliated_club, om.position,
+                    COUNT(sa.id) as attend_count
+                FROM members m
+                JOIN org_members om ON m.id = om.member_id AND om.org_id = ?
+                LEFT JOIN schedule_attendances sa ON m.id = sa.member_id AND sa.status = 'present'
+                    AND sa.schedule_id IN (SELECT id FROM schedules WHERE org_id = ?)
+                WHERE om.status = 'active'
+                GROUP BY m.id
+                ORDER BY attend_count DESC
+            `).bind(orgId, orgId).all()
+            return c.json({ total_schedules: total, members: results || [] })
         } else {
             // 종합 개인별 랭킹
             const { results } = await c.env.DB.prepare(`
@@ -1207,6 +1243,98 @@ orgs.get('/:id/attendance-stats', requireAuth, async (c) => {
             `).bind(orgId, orgId).all()
             return c.json(results || [])
         }
+    } catch (e) {
+        return c.json({ error: (e as Error).message }, 500)
+    }
+})
+
+// ── 캘린더 데이터 (월별 일정 조회) ──
+orgs.get('/:id/calendar', requireAuth, async (c) => {
+    try {
+        const orgId = parseInt(c.req.param('id'), 10)
+        const year = parseInt(c.req.query('year') || new Date().getFullYear().toString())
+        const month = parseInt(c.req.query('month') || (new Date().getMonth() + 1).toString())
+
+        const startDate = `${year}-${String(month).padStart(2, '0')}-01T00:00:00`
+        const endDate = month === 12 ? `${year + 1}-01-01T00:00:00` : `${year}-${String(month + 1).padStart(2, '0')}-01T00:00:00`
+
+        const { results } = await c.env.DB.prepare(`
+            SELECT id, title, start_time, end_time, event_type, location, description
+            FROM schedules 
+            WHERE org_id = ? AND start_time >= ? AND start_time < ?
+            ORDER BY start_time ASC
+        `).bind(orgId, startDate, endDate).all()
+
+        // 출석 수도 함께 반환
+        const scheduleIds = (results || []).map((r: any) => r.id)
+        const attendCounts: Record<number, number> = {}
+        for (const sid of scheduleIds) {
+            const cnt = await c.env.DB.prepare('SELECT COUNT(*) as c FROM schedule_attendances WHERE schedule_id = ? AND status = ?').bind(sid, 'present').first() as any
+            attendCounts[sid] = cnt?.c || 0
+        }
+
+        return c.json({
+            year, month,
+            schedules: (results || []).map((r: any) => ({ ...r, attend_count: attendCounts[r.id] || 0 }))
+        })
+    } catch (e) {
+        return c.json({ error: (e as Error).message }, 500)
+    }
+})
+
+// ── 내부 경기 기록 (Match Records) ──
+orgs.get('/:id/match-records', requireAuth, async (c) => {
+    try {
+        const orgId = parseInt(c.req.param('id'), 10)
+        const { results } = await c.env.DB.prepare(`
+            SELECT * FROM org_match_records 
+            WHERE org_id = ? 
+            ORDER BY match_date DESC
+            LIMIT 100
+        `).bind(orgId).all()
+        return c.json(results || [])
+    } catch (e) {
+        return c.json([] as any[])
+    }
+})
+
+orgs.post('/:id/match-records', requireAuth, async (c) => {
+    try {
+        const user = c.get('adminUser')
+        const orgId = parseInt(c.req.param('id'), 10)
+        const b = await c.req.json()
+
+        const isSuperAdmin = user.global_role === 'super_admin'
+        const roleCheck = await c.env.DB.prepare('SELECT role FROM user_roles WHERE user_id = ? AND target_type = ? AND target_id = ?').bind(user.id, 'org', orgId).first() as any
+        const isOrgAdmin = roleCheck && roleCheck.role === 'admin'
+        if (!isSuperAdmin && !isOrgAdmin) return c.json({ error: '권한이 없습니다.' }, 403)
+
+        const { match_date, match_type, player1_name, player2_name, player1_score, player2_score, player3_name, player4_name, notes } = b
+
+        const { success } = await c.env.DB.prepare(`
+            INSERT INTO org_match_records (org_id, match_date, match_type, player1_name, player2_name, player1_score, player2_score, player3_name, player4_name, notes, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(orgId, match_date, match_type || 'singles', player1_name, player2_name, player1_score || 0, player2_score || 0, player3_name || null, player4_name || null, notes || null, user.id).run()
+
+        return c.json({ message: '경기 기록 저장 완료' }, 201)
+    } catch (e) {
+        return c.json({ error: (e as Error).message }, 500)
+    }
+})
+
+orgs.delete('/:id/match-records/:recordId', requireAuth, async (c) => {
+    try {
+        const user = c.get('adminUser')
+        const orgId = parseInt(c.req.param('id'), 10)
+        const recordId = parseInt(c.req.param('recordId'), 10)
+
+        const isSuperAdmin = user.global_role === 'super_admin'
+        const roleCheck = await c.env.DB.prepare('SELECT role FROM user_roles WHERE user_id = ? AND target_type = ? AND target_id = ?').bind(user.id, 'org', orgId).first() as any
+        const isOrgAdmin = roleCheck && roleCheck.role === 'admin'
+        if (!isSuperAdmin && !isOrgAdmin) return c.json({ error: '권한이 없습니다.' }, 403)
+
+        await c.env.DB.prepare('DELETE FROM org_match_records WHERE id = ? AND org_id = ?').bind(recordId, orgId).run()
+        return c.json({ message: '삭제 완료' })
     } catch (e) {
         return c.json({ error: (e as Error).message }, 500)
     }
