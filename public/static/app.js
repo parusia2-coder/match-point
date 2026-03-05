@@ -1339,54 +1339,74 @@ async function manageOrgMembers(id) {
     if (!org) { showToast('단체를 찾을 수 없습니다.', 'error'); return; }
 
     const members = await apiFetch('/api/orgs', '/' + id + '/members');
+    let duesData = [];
+    try { duesData = await apiFetch('/api/orgs', '/' + id + '/dues'); } catch (e) { }
+    const currentYear = new Date().getFullYear();
+    const paidMemberIds = new Set(duesData.filter(d => d.target_year === currentYear && d.payment_status === 'completed').map(d => d.member_id));
+
     window.currentOrgMembers = members;
     window.currentOrgId = id;
+    window.currentOrgPaidIds = paidMemberIds;
 
-    showModal(`👥 ${org.name} 소속 회원 통합 관리`, `
-      <div style="display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid #f1f5f9; padding-bottom:12px; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
-        <h2 style="font-size:1.1rem; font-weight:800; color:var(--text-primary); margin:0;">
-          등록된 회원 명단 (<span id="orgMemberCount">${members.length}</span>명)
-        </h2>
+    showModal(`👥 ${org.name} 회원 통합 관리`, `
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--border); padding-bottom:12px; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+        <h2 style="font-size:1.1rem; font-weight:800; color:var(--text-primary); margin:0;">등록 회원 (<span id="orgMemberCount">${members.length}</span>명)</h2>
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
-          <button class="btn btn-sm" style="border:1px solid #10b981; color:#10b981; background:rgba(16,185,129,0.05);" onclick="downloadOrgMemberTemplate()">📝 양식(CSV) 다운로드</button>
-          <button class="btn btn-sm btn-primary" onclick="showOrgMemberBulkUpload()">⬆️ 회원 일괄 등록</button>
-          <button class="btn btn-sm" style="border:1px solid #3b82f6; color:#3b82f6; background:rgba(59,130,246,0.05);" onclick="exportOrgMembers()">💾 엑셀로 명부 저장</button>
-          <button class="btn btn-sm" style="border:1px solid #8b5cf6; color:#8b5cf6; background:rgba(139,92,246,0.05);" onclick="showSendOrgSms()">💬 알림톡/문자 발송</button>
-          <button class="btn btn-sm" style="border:1px solid #ef4444; color:#ef4444; background:rgba(239,68,68,0.05);" onclick="deleteAllOrgMembers()">🗑️ 전체 삭제</button>
+          <button class="btn btn-sm" style="border:1px solid #10b981; color:#10b981; background:rgba(16,185,129,0.05);" onclick="downloadOrgMemberTemplate()">📝 양식</button>
+          <button class="btn btn-sm" style="border:1px solid #3b82f6; color:#3b82f6; background:rgba(59,130,246,0.05);" onclick="exportOrgMembers()">💾 명부저장</button>
+          <button class="btn btn-sm" style="border:1px solid #8b5cf6; color:#8b5cf6; background:rgba(139,92,246,0.05);" onclick="showSendOrgSms()">💬 문자</button>
+          <button class="btn btn-sm" style="border:1px solid #ef4444; color:#ef4444; background:rgba(239,68,68,0.05);" onclick="deleteAllOrgMembers()">🗑 초기화</button>
         </div>
       </div>
-
       <div style="display:flex; gap:10px; margin-bottom:12px;">
-        <input type="text" id="orgMemberSearch" class="form-control" placeholder="🔍 목록 내 이름, 클럽 검색..." onkeyup="filterOrgMembers()" style="flex:1;">
+        <input type="text" id="orgMemberSearch" class="form-control" placeholder="🔍 이름, 소속, 연락처 검색..." onkeyup="filterOrgMembers()" style="flex:1;">
       </div>
-
-      <div style="max-height: 400px; overflow-y:auto; margin-bottom:20px;">
-        <table class="table" style="width:100%; border-collapse:collapse;" id="orgMembersTable">
+      <div style="max-height:300px; overflow:auto; margin-bottom:16px; font-size:0.82rem;">
+        <table class="table" style="width:100%; border-collapse:collapse; min-width:800px;" id="orgMembersTable">
           <thead style="background:var(--bg-card); position:sticky; top:0; box-shadow:0 1px 0 var(--border); z-index:1;">
             <tr>
-              <th style="padding:10px; text-align:center; width:40px;"><input type="checkbox" id="selectAllOrgMembers" onclick="toggleAllOrgMembers(this)"></th>
-              <th style="padding:10px; text-align:left;">이름</th>
-              <th style="padding:10px; text-align:left;">역할</th>
-              <th style="padding:10px; text-align:left;">공인급수</th>
-              <th style="padding:10px; text-align:left;">세부소속클럽</th>
-              <th style="padding:10px; text-align:left;">상태</th>
-              <th style="padding:10px; text-align:center;">관리</th>
+              <th style="padding:6px; text-align:center; width:30px;"><input type="checkbox" id="selectAllOrgMembers" onclick="toggleAllOrgMembers(this)"></th>
+              <th style="padding:6px;">이름</th>
+              <th style="padding:6px;">성별</th>
+              <th style="padding:6px;">생년월일</th>
+              <th style="padding:6px;">소속</th>
+              <th style="padding:6px;">급수</th>
+              <th style="padding:6px;">직위</th>
+              <th style="padding:6px;">연락처</th>
+              <th style="padding:6px;">사이즈</th>
+              <th style="padding:6px;">회비</th>
+              <th style="padding:6px; text-align:center;">관리</th>
             </tr>
           </thead>
-          <tbody id="orgMembersTbody">
-            <!-- 렌더링 영역 -->
-          </tbody>
+          <tbody id="orgMembersTbody"></tbody>
         </table>
       </div>
-
-      <div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9); border:1px solid #e2e8f0; border-radius:12px; padding:16px;">
-        <h4 style="margin:0 0 12px 0; font-size:1rem; color:#0f172a;">👤 개별 회원 빠른 추가 (이름으로 중앙DB 검색)</h4>
-        <div style="display:flex; gap:8px;">
-          <input type="text" id="addMemberQuery" class="form-control" placeholder="추가할 회원의 이름 검색..." style="flex:1;" onkeydown="if(event.key==='Enter') searchAndAddOrgMember(${org.id})">
-          <button class="btn" style="background:var(--bg-card); border-color:var(--border);" onclick="searchAndAddOrgMember(${org.id})">🔍 검색</button>
-          <button class="btn btn-primary" onclick="showCreateOrgMember(${org.id})">➕ 신규 회원 직접 등록</button>
+      <div style="background:linear-gradient(135deg,#161616,#111); border:1px solid #2A2A2A; border-radius:12px; overflow:hidden;">
+        <div style="display:flex; border-bottom:1px solid #2A2A2A;">
+          <button id="memTabSingle" class="btn" style="flex:1; border:none; border-radius:0; background:#222; color:#fff; font-weight:700; padding:10px;" onclick="switchMemberTab('single')">👤 개별 등록</button>
+          <button id="memTabBulk" class="btn" style="flex:1; border:none; border-radius:0; background:transparent; color:var(--text-muted); font-weight:700; padding:10px;" onclick="switchMemberTab('bulk')">📋 일괄 등록</button>
         </div>
-        <div id="addMemberResult" style="margin-top:12px;"></div>
+        <div id="memPanelSingle" style="padding:16px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+            <div class="form-group" style="margin:0;"><label>이름 *</label><input type="text" id="newOmName" class="form-control" placeholder="홍길동"></div>
+            <div class="form-group" style="margin:0;"><label>성별</label><select id="newOmGender" class="form-control"><option value="m">남</option><option value="f">여</option></select></div>
+            <div class="form-group" style="margin:0;"><label>생년월일</label><input type="date" id="newOmBirthDate" class="form-control"></div>
+            <div class="form-group" style="margin:0;"><label>소속</label><input type="text" id="newOmClub" class="form-control" placeholder="소속 클럽"></div>
+            <div class="form-group" style="margin:0;"><label>급수</label><input type="text" id="newOmLevel" class="form-control" placeholder="A, B, C..."></div>
+            <div class="form-group" style="margin:0;"><label>직위</label><select id="newOmPosition" class="form-control"><option value="">일반</option><option value="president">회장</option><option value="vice_president">부회장</option><option value="secretary">총무</option><option value="auditor">감사</option><option value="director">이사</option><option value="manager">매니저</option></select></div>
+            <div class="form-group" style="margin:0;"><label>연락처</label><input type="text" id="newOmPhone" class="form-control" placeholder="010-1234-5678"></div>
+            <div class="form-group" style="margin:0;"><label>옷사이즈</label><select id="newOmSize" class="form-control"><option value="">선택안함</option><option value="XS">XS</option><option value="S">S</option><option value="M">M</option><option value="L">L</option><option value="XL">XL</option><option value="2XL">2XL</option><option value="3XL">3XL</option></select></div>
+          </div>
+          <button class="btn btn-primary" style="margin-top:12px; width:100%; background:linear-gradient(135deg,#f97316,#ea580c); border:none; font-weight:800;" onclick="submitSingleOrgMember(${org.id})">👤 회원 등록하기</button>
+        </div>
+        <div id="memPanelBulk" style="padding:16px; display:none;">
+          <div style="background:rgba(249,115,22,0.1); border:1px solid rgba(249,115,22,0.3); border-radius:8px; padding:10px; margin-bottom:12px; font-size:0.82rem; color:#fbbf24;">
+            💡 엑셀/CSV에서 <b>복사→붙여넣기</b> 하세요. 양식: 이름, 연락처, 성별(남/여), 생년월일, 소속, 급수, 직위, 옷사이즈
+          </div>
+          <textarea id="orgBulkMemberData" class="form-control" style="height:160px; font-family:monospace; font-size:0.82rem;" placeholder="홍길동&#09;010-1234-5678&#09;남&#09;1980-05-15&#09;강남클럽&#09;C&#09;회장&#09;L
+김영희&#09;010-1111-2222&#09;여&#09;1990-03-20&#09;잠실클럽&#09;D&#09;&#09;M"></textarea>
+          <button class="btn btn-primary" style="margin-top:10px; width:100%; background:linear-gradient(135deg,#8b5cf6,#6366f1); border:none; font-weight:800;" onclick="submitOrgBulkMembers()">📋 일괄 등록하기</button>
+        </div>
       </div>
     `, null, { hideConfirm: true, wide: true });
 
@@ -1396,215 +1416,145 @@ async function manageOrgMembers(id) {
       const tbody = document.getElementById('orgMembersTbody');
       if (!tbody || !window.currentOrgMembers) return;
       const q = (document.getElementById('orgMemberSearch')?.value || '').toLowerCase();
-
       const filtered = window.currentOrgMembers.filter(m =>
         m.name.toLowerCase().includes(q) ||
         (m.affiliated_club && m.affiliated_club.toLowerCase().includes(q)) ||
         (m.phone && m.phone.includes(q))
       );
-
       document.getElementById('orgMemberCount').textContent = filtered.length;
-
       if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="padding:20px; text-align:center; color:var(--text-muted);">등록된/검색된 회원이 없습니다.</td></tr>`;
+        tbody.innerHTML = '<tr><td colspan="11" style="padding:30px; text-align:center; color:var(--text-muted);">등록된 회원이 없습니다.</td></tr>';
         return;
       }
-
-      tbody.innerHTML = filtered.map(m => `
-    <tr style="border-bottom:1px solid var(--border);">
-      <td style="padding:10px; text-align:center;"><input type="checkbox" class="org-member-checkbox" value="${m.id}" data-phone="${m.phone || ''}"></td>
-      <td style="padding:10px;">
-        <div style="font-weight:bold; color:var(--text-primary);">${m.name}</div>
-        <div style="font-size:0.8rem; color:var(--text-muted);">${m.phone || '번호없음'} | ${m.birth_year ? m.birth_year.toString().slice(-2) : '??'}${m.gender === 'm' ? '남' : '여'}</div>
-      </td>
-      <td style="padding:10px;">${m.role === 'admin' ? '<span style="color:#C8FF00;font-weight:700;background:#1e293b;padding:2px 6px;border-radius:4px;">👑 운영진</span>' : '일반'}</td>
-      <td style="padding:10px; font-weight:700;">${m.official_level || '-'}</td>
-      <td style="padding:10px; color:#475569;">${m.affiliated_club || '-'}</td>
-      <td style="padding:10px;">
-        <span class="mp-badge ${m.status === 'active' ? 'mp-badge-open' : 'mp-badge-done'}">${m.status}</span>
-      </td>
-      <td style="padding:10px; text-align:center;">
-        <button class="btn btn-sm" style="background:rgba(139,92,246,0.1); color:#8b5cf6;" onclick="editOrgMember(${window.currentOrgId}, ${m.id}, '${m.name}', '${m.role}', '${m.official_level || ''}', '${m.affiliated_club || ''}', '${m.status}')">수정</button>
-        <button class="btn btn-sm" style="background:rgba(239,68,68,0.1); color:#ef4444;" onclick="removeOrgMember(${window.currentOrgId}, ${m.id})">추방</button>
-      </td>
-    </tr>
-  `).join('');
-
-      // Update toggle-all checkbox logic
+      const posLabels = { president: '회장', vice_president: '부회장', secretary: '총무', auditor: '감사', director: '이사', manager: '매니저' };
+      const paidIds = window.currentOrgPaidIds || new Set();
+      tbody.innerHTML = filtered.map(m => {
+        const birthStr = m.birth_date || (m.birth_year ? m.birth_year + '' : '-');
+        const posLabel = posLabels[m.position] || (m.position || '-');
+        const isPaid = paidIds.has(m.member_id);
+        return '<tr style="border-bottom:1px solid var(--border);">' +
+          '<td style="padding:6px; text-align:center;"><input type="checkbox" class="org-member-checkbox" value="' + m.id + '" data-phone="' + (m.phone || '') + '"></td>' +
+          '<td style="padding:6px; font-weight:bold;">' + m.name + '</td>' +
+          '<td style="padding:6px;">' + (m.gender === 'f' ? '여' : '남') + '</td>' +
+          '<td style="padding:6px; font-size:0.8rem; color:var(--text-muted);">' + birthStr + '</td>' +
+          '<td style="padding:6px;">' + (m.affiliated_club || '-') + '</td>' +
+          '<td style="padding:6px; font-weight:700;">' + (m.official_level || '-') + '</td>' +
+          '<td style="padding:6px;">' + posLabel + '</td>' +
+          '<td style="padding:6px; font-size:0.8rem;">' + (m.phone || '-') + '</td>' +
+          '<td style="padding:6px;">' + (m.clothing_size || '-') + '</td>' +
+          '<td style="padding:6px; text-align:center;">' + (isPaid ? '<span style="color:#10b981;font-weight:700;">✅</span>' : '<span style="color:#ef4444;font-weight:700;">❌</span>') + '</td>' +
+          '<td style="padding:6px; text-align:center; white-space:nowrap;">' +
+          '<button class="btn btn-sm" style="margin:1px; background:rgba(139,92,246,0.1); color:#8b5cf6;" onclick="editOrgMember(' + window.currentOrgId + ',' + m.id + ')">✏️</button>' +
+          '<button class="btn btn-sm" style="margin:1px; background:rgba(239,68,68,0.1); color:#ef4444;" onclick="removeOrgMember(' + window.currentOrgId + ',' + m.id + ')">🗑</button>' +
+          '</td></tr>';
+      }).join('');
       const selectAllCb = document.getElementById('selectAllOrgMembers');
       if (selectAllCb) selectAllCb.checked = false;
     };
 
     window.toggleAllOrgMembers = function (source) {
-      document.querySelectorAll('.org-member-checkbox').forEach(cb => {
-        cb.checked = source.checked;
+      document.querySelectorAll('.org-member-checkbox').forEach(cb => { cb.checked = source.checked; });
+    };
+    window.filterOrgMembers = function () { renderOrgMembersTable(); };
+
+    window.switchMemberTab = function (tab) {
+      const sTab = document.getElementById('memTabSingle'), bTab = document.getElementById('memTabBulk');
+      const sPanel = document.getElementById('memPanelSingle'), bPanel = document.getElementById('memPanelBulk');
+      if (tab === 'single') {
+        sTab.style.background = '#222'; sTab.style.color = '#fff';
+        bTab.style.background = 'transparent'; bTab.style.color = 'var(--text-muted)';
+        sPanel.style.display = 'block'; bPanel.style.display = 'none';
+      } else {
+        bTab.style.background = '#222'; bTab.style.color = '#fff';
+        sTab.style.background = 'transparent'; sTab.style.color = 'var(--text-muted)';
+        bPanel.style.display = 'block'; sPanel.style.display = 'none';
+      }
+    };
+
+    window.downloadOrgMemberTemplate = function () {
+      const tsv = "이름\t연락처\t성별(남/여)\t생년월일(YYYY-MM-DD)\t소속\t급수\t직위\t옷사이즈\n홍길동\t010-1234-5678\t남\t1980-05-15\t강남클럽\tC\t회장\tL\n김영희\t010-9876-5432\t여\t1990-03-20\t잠실클럽\tD\t\tM";
+      const blob = new Blob(["\uFEFF" + tsv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = "회원_일괄등록양식.csv"; a.click();
+      URL.revokeObjectURL(url);
+      showToast('양식 파일이 다운로드되었습니다.', 'success');
+    };
+
+    window.exportOrgMembers = function () {
+      if (!window.currentOrgMembers || window.currentOrgMembers.length === 0) return showToast('저장할 회원이 없습니다.', 'error');
+      const posLabels = { president: '회장', vice_president: '부회장', secretary: '총무', auditor: '감사', director: '이사', manager: '매니저' };
+      const paidIds = window.currentOrgPaidIds || new Set();
+      let csv = "이름,성별,생년월일,소속,급수,직위,연락처,옷사이즈,회비납부,상태,가입일\n";
+      window.currentOrgMembers.forEach(m => {
+        const posTxt = posLabels[m.position] || (m.position || '');
+        const birthStr = m.birth_date || (m.birth_year ? m.birth_year + '' : '');
+        const paidTxt = paidIds.has(m.member_id) ? '납부' : '미납';
+        csv += '"' + m.name + '","' + (m.gender === 'f' ? '여' : '남') + '","' + birthStr + '","' + (m.affiliated_club || '') + '","' + (m.official_level || '') + '","' + posTxt + '","' + (m.phone || '') + '","' + (m.clothing_size || '') + '","' + paidTxt + '","' + m.status + '","' + (m.joined_at || '') + '"\n';
       });
+      const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = '회원명부_' + new Date().toLocaleDateString() + '.csv'; a.click();
+      URL.revokeObjectURL(url);
+      showToast('명부가 저장되었습니다.', 'success');
+    };
+
+    window.deleteAllOrgMembers = async function () {
+      if (!confirm('⚠️ 모든 회원 목록을 초기화합니다.\n정말 삭제하시겠습니까?')) return;
+      if (!confirm('❗ 되돌릴 수 없습니다. 계속하시겠습니까?')) return;
+      try {
+        await apiFetch('/api/orgs', '/' + window.currentOrgId + '/members', { method: 'DELETE' });
+        showToast('전체 초기화되었습니다.', 'success');
+        manageOrgMembers(window.currentOrgId);
+      } catch (e) { showToast(e.message, 'error'); }
     };
 
     window.showSendOrgSms = function () {
       const selectedIds = Array.from(document.querySelectorAll('.org-member-checkbox:checked')).map(cb => parseInt(cb.value));
-      const validSelectedCount = Array.from(document.querySelectorAll('.org-member-checkbox:checked')).filter(cb => cb.dataset.phone).length;
-
       if (selectedIds.length === 0) {
-        // No one selected directly, let's select ALL currently visible rows that have phones
-        const allVisibleIds = Array.from(document.querySelectorAll('.org-member-checkbox')).filter(cb => cb.dataset.phone).map(cb => parseInt(cb.value));
-        if (allVisibleIds.length === 0) return showToast('발송 가능한 회원이 목록에 없습니다.', 'error');
-
-        if (confirm(`선택한 회원이 없습니다.\n현재 검색/표시된 모든 회원 중 번호가 명확한 ${allVisibleIds.length}명에게 전체 문자를 발송하시겠습니까?`)) {
-          openSmsModal(allVisibleIds);
-        }
+        const allIds = Array.from(document.querySelectorAll('.org-member-checkbox')).filter(cb => cb.dataset.phone).map(cb => parseInt(cb.value));
+        if (allIds.length === 0) return showToast('발송 가능한 회원이 없습니다.', 'error');
+        if (confirm('전체 ' + allIds.length + '명에게 발송하시겠습니까?')) openMemberSmsModal(allIds);
       } else {
-        if (validSelectedCount < selectedIds.length) {
-          if (!confirm(`선택한 ${selectedIds.length}명 중 ${selectedIds.length - validSelectedCount}명은 휴대폰 번호가 없습니다.\n나머지 ${validSelectedCount}명에게만 발송하시겠습니까?`)) return;
-        }
-        if (validSelectedCount > 0) {
-          openSmsModal(selectedIds);
-        } else {
-          showToast('선택한 회원들 모두 번호가 등록되지 않았습니다.', 'error');
-        }
+        openMemberSmsModal(selectedIds);
       }
     };
 
-    function openSmsModal(targetIds) {
-      showModal('💬 단체 문자 / 알림톡 발송', `
-          <div style="margin-bottom:16px;">
-            <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom:8px;">
-              선택/표시된 <strong>${targetIds.length}</strong>명에게 문자를 발송합니다.<br>
-              <small>(메시지 앞에 단체 이름이 자동 포함될 수 있습니다)</small>
-            </p>
-            <textarea id="orgSmsContent" class="form-control" style="height:120px; resize:vertical;" placeholder="발송할 메시지 내용을 입력하세요..."></textarea>
-          </div>
-        `, async () => {
+    function openMemberSmsModal(targetIds) {
+      showModal('💬 문자 발송', '<p style="font-size:0.9rem; color:var(--text-muted); margin-bottom:8px;"><strong>' + targetIds.length + '</strong>명에게 발송</p><textarea id="orgSmsContent" class="form-control" style="height:120px;" placeholder="메시지 내용..."></textarea>', async () => {
         const message = document.getElementById('orgSmsContent').value.trim();
-        if (message.length < 2) return showToast('메시지를 2자 이상 입력해주세요.', 'warning');
-
-        document.getElementById('modalConfirm').disabled = true;
-        document.getElementById('modalConfirm').textContent = '발송 중...';
-
+        if (message.length < 2) return showToast('2자 이상 입력하세요.', 'warning');
         try {
-          const res = await apiFetch('/api/orgs', '/' + window.currentOrgId + '/members/sms', {
-            method: 'POST', body: { member_ids: targetIds, message }
-          });
-          showToast(res.message || '발송되었습니다.', 'success');
-          closeModal();
-        } catch (e) {
-          showToast(e.message, 'error');
-          document.getElementById('modalConfirm').disabled = false;
-          document.getElementById('modalConfirm').textContent = '✅ 저장';
-        }
+          const res = await apiFetch('/api/orgs', '/' + window.currentOrgId + '/members/sms', { method: 'POST', body: { member_ids: targetIds, message } });
+          showToast(res.message || '발송 완료', 'success'); closeModal();
+        } catch (e) { showToast(e.message, 'error'); }
       });
-
-      setTimeout(() => {
-        const btn = document.getElementById('modalConfirm');
-        if (btn) {
-          btn.textContent = '🚀 문자 전송';
-          btn.style.background = '#8b5cf6';
-        }
-      }, 50);
+      setTimeout(() => { const btn = document.getElementById('modalConfirm'); if (btn) { btn.textContent = '🚀 전송'; btn.style.background = '#8b5cf6'; } }, 50);
     }
-
-    window.filterOrgMembers = function () {
-      renderOrgMembersTable();
-    };
-
-    window.downloadOrgMemberTemplate = function () {
-      const tsv = "이름\t전화번호\t성별(m/f)\t출생년도(4자리)\t중앙급수\t세부소속클럽\t공인급수\n홍길동\t010-1234-5678\tm\t1980\tD\t강남클럽\tC\n김연아\t010-9876-5432\tf\t1990\tS\t송파클럽\tS";
-      const blob = new Blob([tsv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = "단체회원_일괄등록양식.csv";
-      a.click();
-      URL.revokeObjectURL(url);
-    };
-
-    window.exportOrgMembers = function () {
-      if (!window.currentOrgMembers || window.currentOrgMembers.length === 0) {
-        return showToast('저장할 회원이 없습니다.', 'error');
-      }
-      let csv = "이름,전화번호,성별,생년,역할,공인급수,세부소속클럽,상태,가입일\n";
-      window.currentOrgMembers.forEach(m => {
-        csv += `"${m.name}","${m.phone || ''}","${m.gender}","${m.birth_year || ''}","${m.role}","${m.official_level || ''}","${m.affiliated_club || ''}","${m.status}","${m.joined_at || ''}"\n`;
-      });
-      // Prefix BOM for excel
-      const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `회원명부_${new Date().toLocaleDateString()}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    };
-
-    window.deleteAllOrgMembers = async function () {
-      if (!confirm('경고: 이 단체의 모든 회원 목록을 초기화(전체 삭제)합니다.\n정말 삭제하시겠습니까? (중앙 서버의 회원 데이터는 삭제되지 않습니다)')) return;
-      try {
-        await apiFetch('/api/orgs', '/' + window.currentOrgId + '/members', { method: 'DELETE' });
-        showToast('전체 삭제되었습니다.', 'success');
-        manageOrgMembers(window.currentOrgId);
-      } catch (e) {
-        showToast(e.message, 'error');
-      }
-    };
-
-    window.showOrgMemberBulkUpload = function () {
-      const tpl = `
-    <div style="font-size:0.9rem; margin-bottom:12px; color:var(--text-muted);">
-      엑셀이나 CSV 양식에 맞춰 작성된 명단을 아래에 <strong>복사하여 붙여넣기(Ctrl+V)</strong> 해주세요.<br>
-      이름, 전화번호를 기준으로 매칭하여 새로운 회원이면 개별등록까지 일괄 처리됩니다.<br>
-      <small style="color:#ef4444">* 양식: 이름(필수), 전화번호, 성별(m/f), 출생년도, 급수, 세부소속, 공인급수 순</small>
-    </div>
-    <textarea id="orgBulkMemberData" class="form-control" style="height:200px; font-family:monospace; white-space:pre-wrap; background:#f8fafc;" placeholder="홍길동	010-1234-5678	m	1980	c	강남클럽	c
-김영희	010-1111-2222	f	1990	e	잠실클럽	e"></textarea>
-    <div style="margin-top:12px; text-align:right;">
-      <button class="btn btn-primary" onclick="submitOrgBulkMembers()">일괄 전송 및 등록</button>
-    </div>
-  `;
-      const div = document.createElement('div');
-      div.id = 'orgBulkUploadContainer';
-      div.style.marginTop = '20px';
-      div.style.paddingTop = '20px';
-      div.style.borderTop = '1px solid #e2e8f0';
-      div.innerHTML = tpl;
-
-      const searchSection = document.getElementById('addMemberResult').parentNode;
-      searchSection.parentNode.insertBefore(div, searchSection);
-      document.getElementById('orgBulkMemberData').focus();
-    };
 
     window.submitOrgBulkMembers = async function () {
       const data = document.getElementById('orgBulkMemberData').value.trim();
-      if (!data) return showToast('데이터를 입력해주세요.', 'error');
-
+      if (!data) return showToast('데이터를 입력하세요.', 'error');
+      const posMap = { '회장': 'president', '부회장': 'vice_president', '총무': 'secretary', '감사': 'auditor', '이사': 'director', '매니저': 'manager' };
       const lines = data.split('\n');
       const members = [];
       lines.forEach(line => {
-        const cols = line.split(/[	,]+/).map(c => c.trim()); // tab or comma
+        const cols = line.split(/[\t,]+/).map(c => c.trim());
         if (cols.length >= 1 && cols[0]) {
-          members.push({
-            name: cols[0],
-            phone: cols[1] || null,
-            gender: (cols[2] || '').toLowerCase() === 'f' || cols[2] === '여' ? 'f' : 'm',
-            birth_year: parseInt(cols[3]) || null,
-            global_level: cols[4] || 'E',
-            affiliated_club: cols[5] || null,
-            official_level: cols[6] || null
-          });
+          const gr = (cols[2] || '').toLowerCase();
+          const gender = (gr === 'f' || gr === '여' || gr === 'female') ? 'f' : 'm';
+          const br = cols[3] || '';
+          let birth_year = null, birth_date = null;
+          if (br.includes('-')) { birth_date = br; birth_year = parseInt(br.split('-')[0]) || null; }
+          else if (br.length === 4) { birth_year = parseInt(br) || null; }
+          members.push({ name: cols[0], phone: cols[1] || null, gender, birth_year, birth_date, affiliated_club: cols[4] || null, official_level: cols[5] || null, position: posMap[cols[6]] || cols[6] || null, clothing_size: cols[7] || null });
         }
       });
-
-      if (members.length === 0) return showToast('분석 가능한 데이터가 없습니다.', 'error');
-
+      if (members.length === 0) return showToast('인식 가능한 데이터가 없습니다.', 'error');
       try {
-        const res = await apiFetch('/api/orgs', '/' + window.currentOrgId + '/members/bulk', {
-          method: 'POST',
-          body: { members }
-        });
-        showToast(res.message || '등록되었습니다.', 'success');
+        const res = await apiFetch('/api/orgs', '/' + window.currentOrgId + '/members/bulk', { method: 'POST', body: { members } });
+        showToast(res.message || members.length + '명 등록', 'success');
         manageOrgMembers(window.currentOrgId);
-      } catch (e) {
-        showToast(e.message, 'error');
-      }
+      } catch (e) { showToast(e.message, 'error'); }
     };
 
   } catch (e) {
@@ -1612,186 +1562,65 @@ async function manageOrgMembers(id) {
   }
 }
 
-async function searchAndAddOrgMember(orgId) {
-  const q = document.getElementById('addMemberQuery').value.trim();
-  if (!q) return;
-
-  const resDiv = document.getElementById('addMemberResult');
-  resDiv.innerHTML = '<div style="color:var(--text-muted);">검색 중...</div>';
-
+window.submitSingleOrgMember = async function (orgId) {
+  const name = document.getElementById('newOmName').value.trim();
+  if (!name) return showToast('이름은 필수입니다.', 'error');
+  const bd = document.getElementById('newOmBirthDate')?.value || '';
+  const memberData = [{ name, phone: document.getElementById('newOmPhone').value.trim() || null, gender: document.getElementById('newOmGender').value, birth_year: bd ? parseInt(bd.split('-')[0]) : null, birth_date: bd || null, affiliated_club: document.getElementById('newOmClub').value.trim() || null, official_level: document.getElementById('newOmLevel').value.trim() || null, position: document.getElementById('newOmPosition').value || null, clothing_size: document.getElementById('newOmSize').value || null }];
   try {
-    const res = await apiFetch('/api/members?q=' + encodeURIComponent(q));
-    if (!res.members || res.members.length === 0) {
-      resDiv.innerHTML = `
-        <div style="color:#ef4444; font-weight:bold; margin-bottom:8px;">중앙 DB에서 검색 결과가 없습니다.</div>
-        <div style="color:var(--text-muted); font-size:0.9rem;">신규 회원일 경우 '신규 회원 직접 등록'을 이용해주세요.</div>
-      `;
-      return;
-    }
-
-    resDiv.innerHTML = `
-      <table class="table" style="width:100%; border-collapse:collapse; background:#fff;">
-        ${res.members.map(m => `
-          <tr style="border-bottom:1px solid #e2e8f0;">
-            <td style="padding:10px;">
-              <b>${m.name}</b> <span style="font-size:0.8rem; color:var(--text-muted);">
-              (${m.birth_year ? m.birth_year.toString().slice(-2) : ''}${m.gender === 'm' ? '남' : '여'}) ${m.phone || ''}
-              </span>
-            </td>
-            <td style="padding:10px; color:#475569;">${m.club || '-'} / ${m.level || '-'}</td>
-            <td style="padding:10px; text-align:right;">
-              <button class="btn btn-sm" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-weight:700;" onclick="addOrgMemberAction(${orgId}, ${m.id})">단체에 추가</button>
-            </td>
-          </tr>
-        `).join('')}
-      </table>
-    `;
-  } catch (e) {
-    resDiv.innerHTML = '<div style="color:red;">검색 오류: ' + e.message + '</div>';
-  }
-}
-
-async function addOrgMemberAction(orgId, memberId) {
-  try {
-    await apiFetch('/api/orgs', '/' + orgId + '/members', {
-      method: 'POST',
-      body: { member_id: memberId }
-    });
-    showToast('회원이 단체에 성공적으로 추가되었습니다!', 'success');
-    manageOrgMembers(orgId); // refresh
-  } catch (e) {
-    showToast(e.message, 'error');
-  }
-}
-
-window.showCreateOrgMember = function (orgId) {
-  showModal('➕ 신규 회원 직접 등록 (단체 및 중앙DB 동시추가)', `
-    <div style="display:flex; flex-direction:column; gap:12px;">
-      <p style="font-size:0.9rem; color:var(--text-muted);">이름, 전화번호는 정확히 입력해주세요. (향후 로그인 연동 및 중복방지 기준이 됩니다)</p>
-      <div class="form-group">
-        <label>이름 (필수)</label>
-        <input type="text" id="newOmName" class="form-control" placeholder="홍길동">
-      </div>
-      <div class="form-group">
-        <label>연락처</label>
-        <input type="text" id="newOmPhone" class="form-control" placeholder="010-1234-5678">
-      </div>
-      <div style="display:flex; gap:10px;">
-        <div class="form-group" style="flex:1;">
-          <label>성별</label>
-          <select id="newOmGender" class="form-control">
-            <option value="m">남</option>
-            <option value="f">여</option>
-          </select>
-        </div>
-        <div class="form-group" style="flex:1;">
-          <label>출생년도(4자리)</label>
-          <input type="number" id="newOmBirthYear" class="form-control" placeholder="1990">
-        </div>
-      </div>
-      <div style="display:flex; gap:10px;">
-        <div class="form-group" style="flex:1;">
-          <label>세부 소속클럽</label>
-          <input type="text" id="newOmClub" class="form-control" placeholder="상록클럽">
-        </div>
-        <div class="form-group" style="flex:1;">
-          <label>공인 급수</label>
-          <input type="text" id="newOmOfficialLevel" class="form-control" placeholder="A조, S조 등">
-        </div>
-      </div>
-    </div>
-  `, async () => {
-    const name = document.getElementById('newOmName').value.trim();
-    const phone = document.getElementById('newOmPhone').value.trim();
-    if (!name) return showToast('이름은 필수입니다.', 'error');
-
-    confirmBtn.disabled = true;
-    confirmBtn.innerHTML = '<div class="spinner" style="width:16px;height:16px;"></div> 등록 중...';
-
-    try {
-      // 1. 단일 데이터 배열로 만들어서 bulk api 호출해버리면 동일 로직을 수행함
-      // /api/orgs/:id/members/bulk 는 전화번호 중복체크 후 맵핑까지 다해줌
-      // 그래서 별도로 /api/members 에 쏠 필요가 없음
-      const membersToCreate = [{
-        name,
-        phone,
-        gender: document.getElementById('newOmGender').value,
-        birth_year: parseInt(document.getElementById('newOmBirthYear').value) || null,
-        global_level: 'E',
-        affiliated_club: document.getElementById('newOmClub').value.trim(),
-        official_level: document.getElementById('newOmOfficialLevel').value.trim()
-      }];
-
-      const res = await apiFetch('/api/orgs', '/' + orgId + '/members/bulk', {
-        method: 'POST',
-        body: { members: membersToCreate }
-      });
-      showToast(res.message || '등록되었습니다.', 'success');
-      closeModal();
-      manageOrgMembers(orgId); // refresh
-    } catch (e) {
-      showToast(e.message, 'error');
-      confirmBtn.disabled = false;
-      confirmBtn.innerHTML = '확인';
-    }
-  });
+    const res = await apiFetch('/api/orgs', '/' + orgId + '/members/bulk', { method: 'POST', body: { members: memberData } });
+    showToast(res.message || '등록 완료', 'success');
+    manageOrgMembers(orgId);
+  } catch (e) { showToast(e.message, 'error'); }
 };
 
-function editOrgMember(orgId, omId, name, role, level, club, status) {
-  showModal(`👤 ${name} 정보 수정`, `
-    <div class="form-group">
-      <label>역할</label>
-      <select class="form-control" id="emRole">
-        <option value="member" ${role === 'member' ? 'selected' : ''}>일반 회원</option>
-        <option value="admin" ${role === 'admin' ? 'selected' : ''}>운영진 (Admin)</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>협회 발급 급수</label>
-      <input class="form-control" id="emLevel" value="${level}">
-    </div>
-    <div class="form-group">
-      <label>소속 클럽</label>
-      <input class="form-control" id="emClub" value="${club}">
-    </div>
-    <div class="form-group">
-      <label>승인 상태</label>
-      <select class="form-control" id="emStatus">
-        <option value="active" ${status === 'active' ? 'selected' : ''}>활동중 (Active)</option>
-        <option value="pending" ${status === 'pending' ? 'selected' : ''}>승인대기 (Pending)</option>
-        <option value="suspended" ${status === 'suspended' ? 'selected' : ''}>정지 (Suspended)</option>
-      </select>
-    </div>
-  `, async () => {
-    try {
-      await apiFetch('/api/orgs', '/' + orgId + '/members/' + omId, {
-        method: 'PUT',
-        body: {
-          role: document.getElementById('emRole').value,
-          official_level: document.getElementById('emLevel').value,
-          affiliated_club: document.getElementById('emClub').value,
-          status: document.getElementById('emStatus').value
-        }
-      });
-      showToast('정보가 수정되었습니다.', 'success');
-      closeModal();
-      manageOrgMembers(orgId); // refresh
-    } catch (e) {
-      showToast(e.message, 'error');
-    }
-  });
+function editOrgMember(orgId, omId) {
+  const m = (window.currentOrgMembers || []).find(x => x.id === omId);
+  if (!m) return showToast('회원 정보를 찾을 수 없습니다.', 'error');
+  const bd = m.birth_date || '';
+
+  showModal('✏️ ' + m.name + ' 정보 수정', '<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">' +
+    '<div class="form-group" style="margin:0;"><label>이름</label><input type="text" id="emName" class="form-control" value="' + m.name + '"></div>' +
+    '<div class="form-group" style="margin:0;"><label>성별</label><select id="emGender" class="form-control"><option value="m"' + (m.gender === 'm' ? ' selected' : '') + '>남</option><option value="f"' + (m.gender === 'f' ? ' selected' : '') + '>여</option></select></div>' +
+    '<div class="form-group" style="margin:0;"><label>생년월일</label><input type="date" id="emBirthDate" class="form-control" value="' + bd + '"></div>' +
+    '<div class="form-group" style="margin:0;"><label>소속</label><input type="text" id="emClub" class="form-control" value="' + (m.affiliated_club || '') + '"></div>' +
+    '<div class="form-group" style="margin:0;"><label>급수</label><input type="text" id="emLevel" class="form-control" value="' + (m.official_level || '') + '"></div>' +
+    '<div class="form-group" style="margin:0;"><label>직위</label><select id="emPosition" class="form-control"><option value=""' + (!m.position ? ' selected' : '') + '>일반</option><option value="president"' + (m.position === 'president' ? ' selected' : '') + '>회장</option><option value="vice_president"' + (m.position === 'vice_president' ? ' selected' : '') + '>부회장</option><option value="secretary"' + (m.position === 'secretary' ? ' selected' : '') + '>총무</option><option value="auditor"' + (m.position === 'auditor' ? ' selected' : '') + '>감사</option><option value="director"' + (m.position === 'director' ? ' selected' : '') + '>이사</option><option value="manager"' + (m.position === 'manager' ? ' selected' : '') + '>매니저</option></select></div>' +
+    '<div class="form-group" style="margin:0;"><label>연락처</label><input type="text" id="emPhone" class="form-control" value="' + (m.phone || '') + '"></div>' +
+    '<div class="form-group" style="margin:0;"><label>옷사이즈</label><select id="emSize" class="form-control"><option value=""' + (!m.clothing_size ? ' selected' : '') + '>선택안함</option><option value="XS"' + (m.clothing_size === 'XS' ? ' selected' : '') + '>XS</option><option value="S"' + (m.clothing_size === 'S' ? ' selected' : '') + '>S</option><option value="M"' + (m.clothing_size === 'M' ? ' selected' : '') + '>M</option><option value="L"' + (m.clothing_size === 'L' ? ' selected' : '') + '>L</option><option value="XL"' + (m.clothing_size === 'XL' ? ' selected' : '') + '>XL</option><option value="2XL"' + (m.clothing_size === '2XL' ? ' selected' : '') + '>2XL</option><option value="3XL"' + (m.clothing_size === '3XL' ? ' selected' : '') + '>3XL</option></select></div>' +
+    '<div class="form-group" style="margin:0;"><label>상태</label><select id="emStatus" class="form-control"><option value="active"' + (m.status === 'active' ? ' selected' : '') + '>활동중</option><option value="pending"' + (m.status === 'pending' ? ' selected' : '') + '>승인대기</option><option value="suspended"' + (m.status === 'suspended' ? ' selected' : '') + '>정지</option></select></div>' +
+    '</div>', async () => {
+      const bv = document.getElementById('emBirthDate').value;
+      try {
+        await apiFetch('/api/orgs', '/' + orgId + '/members/' + omId, {
+          method: 'PUT', body: {
+            name: document.getElementById('emName').value.trim(),
+            gender: document.getElementById('emGender').value,
+            phone: document.getElementById('emPhone').value.trim(),
+            birth_date: bv || null, birth_year: bv ? parseInt(bv.split('-')[0]) : null,
+            affiliated_club: document.getElementById('emClub').value.trim(),
+            official_level: document.getElementById('emLevel').value.trim(),
+            position: document.getElementById('emPosition').value,
+            clothing_size: document.getElementById('emSize').value,
+            status: document.getElementById('emStatus').value
+          }
+        });
+        showToast('수정 완료', 'success'); closeModal(); manageOrgMembers(orgId);
+      } catch (e) { showToast(e.message, 'error'); }
+    });
 }
 
 async function removeOrgMember(orgId, omId) {
-  if (!confirm('정말 이 회원을 단체에서 추방하시겠습니까?')) return;
+  if (!confirm('정말 이 회원을 삭제하시겠습니까?')) return;
   try {
     await apiFetch('/api/orgs', '/' + orgId + '/members/' + omId, { method: 'DELETE' });
-    showToast('추방되었습니다.', 'success');
-    manageOrgMembers(orgId); // refresh
-  } catch (e) {
-    showToast(e.message, 'error');
-  }
+    showToast('삭제되었습니다.', 'success'); manageOrgMembers(orgId);
+  } catch (e) { showToast(e.message, 'error'); }
 }
+
+// ===== Organization Finances Management =====
+
+
 
 // ===== Organization Finances Management =====
 async function manageOrgDues(id) {

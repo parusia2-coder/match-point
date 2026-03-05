@@ -375,7 +375,7 @@ orgs.get('/:id/members', requireAuth, async (c) => {
         }
 
         let query = `
-            SELECT om.*, m.name, m.phone, m.gender, m.birth_year, m.level as global_level
+            SELECT om.*, m.name, m.phone, m.gender, m.birth_year, m.birth_date, m.level as global_level
             FROM org_members om
             JOIN members m ON om.member_id = m.id
             WHERE om.org_id = ?
@@ -414,7 +414,7 @@ orgs.post('/:id/members', requireAuth, async (c) => {
             return c.json({ error: '권한이 없습니다.' }, 403)
         }
 
-        const { member_id, role = 'member', affiliated_club, official_level, status = 'active' } = b
+        const { member_id, role = 'member', affiliated_club, official_level, position, clothing_size, status = 'active' } = b
         if (!member_id) return c.json({ error: 'member_id is required' }, 400)
 
         // 중복 체크
@@ -422,9 +422,9 @@ orgs.post('/:id/members', requireAuth, async (c) => {
         if (ext) return c.json({ error: '이미 등록된 회원입니다.' }, 400)
 
         const { success } = await c.env.DB.prepare(`
-            INSERT INTO org_members (org_id, member_id, role, affiliated_club, official_level, status)
-            VALUES (?, ?, ?, ?, ?, ?)
-        `).bind(orgId, member_id, role, affiliated_club || null, official_level || null, status).run()
+            INSERT INTO org_members (org_id, member_id, role, affiliated_club, official_level, position, clothing_size, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(orgId, member_id, role, affiliated_club || null, official_level || null, position || null, clothing_size || null, status).run()
 
         if (success) return c.json({ message: '회원 등록 성공' }, 201)
         return c.json({ error: 'Failed' }, 500)
@@ -454,14 +454,35 @@ orgs.put('/:id/members/:omId', requireAuth, async (c) => {
         const target = await c.env.DB.prepare('SELECT * FROM org_members WHERE id = ? AND org_id = ?').bind(omId, orgId).first() as any
         if (!target) return c.json({ error: '회원 맵핑 정보를 찾을 수 없습니다.' }, 404)
 
+        // 이름/전화번호/성별/생년 등 중앙DB 필드 업데이트
+        if (b.name || b.phone || b.gender || b.birth_year || b.birth_date) {
+            const memberId = target.member_id
+            const existingMember = await c.env.DB.prepare('SELECT * FROM members WHERE id = ?').bind(memberId).first() as any
+            if (existingMember) {
+                await c.env.DB.prepare(`
+                    UPDATE members SET name = ?, phone = ?, gender = ?, birth_year = ?, birth_date = ?
+                    WHERE id = ?
+                `).bind(
+                    b.name || existingMember.name,
+                    b.phone !== undefined ? (b.phone || null) : existingMember.phone,
+                    b.gender || existingMember.gender,
+                    b.birth_year || existingMember.birth_year,
+                    b.birth_date !== undefined ? (b.birth_date || null) : existingMember.birth_date,
+                    memberId
+                ).run()
+            }
+        }
+
         await c.env.DB.prepare(`
             UPDATE org_members
-            SET role = ?, affiliated_club = ?, official_level = ?, status = ?
+            SET role = ?, affiliated_club = ?, official_level = ?, position = ?, clothing_size = ?, status = ?
             WHERE id = ?
         `).bind(
             b.role || target.role,
             b.affiliated_club !== undefined ? b.affiliated_club : target.affiliated_club,
             b.official_level !== undefined ? b.official_level : target.official_level,
+            b.position !== undefined ? (b.position || null) : target.position,
+            b.clothing_size !== undefined ? (b.clothing_size || null) : target.clothing_size,
             b.status || target.status,
             omId
         ).run()
@@ -556,10 +577,10 @@ orgs.post('/:id/members/bulk', requireAuth, async (c) => {
             // 2. 없으면 중앙 DB에 신규 회원 생성
             if (!globalMemberId) {
                 const { success, meta } = await c.env.DB.prepare(`
-                    INSERT INTO members (owner_id, name, phone, gender, birth_year, level, club)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO members (owner_id, name, phone, gender, birth_year, birth_date, level, club)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 `).bind(
-                    user.id, m.name, safePhone, m.gender || 'm', m.birth_year || null, m.global_level || 'E', m.affiliated_club || null
+                    user.id, m.name, safePhone, m.gender || 'm', m.birth_year || null, m.birth_date || null, m.global_level || 'E', m.affiliated_club || null
                 ).run()
                 if (success) globalMemberId = meta.last_row_id
             }
@@ -568,9 +589,9 @@ orgs.post('/:id/members/bulk', requireAuth, async (c) => {
             if (globalMemberId) {
                 try {
                     await c.env.DB.prepare(`
-                        INSERT INTO org_members (org_id, member_id, role, affiliated_club, official_level, status)
-                        VALUES (?, ?, ?, ?, ?, 'active')
-                    `).bind(orgId, globalMemberId, 'member', m.affiliated_club || null, m.official_level || null).run()
+                        INSERT INTO org_members (org_id, member_id, role, affiliated_club, official_level, position, clothing_size, status)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, 'active')
+                    `).bind(orgId, globalMemberId, 'member', m.affiliated_club || null, m.official_level || null, m.position || null, m.clothing_size || null).run()
                     addedCount++;
                 } catch (e) {
                     // Unique constraint error - already mapped
