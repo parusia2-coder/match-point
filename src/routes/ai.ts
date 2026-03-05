@@ -476,4 +476,60 @@ app.post('/:tid/reschedule', async (c) => {
     })
 })
 
+// ── AI 자동 사이트 빌더 ──────────────────────────────────────
+app.post('/build-site', async (c) => {
+    const { prompt } = await c.req.json()
+    if (!prompt) return c.json({ error: 'prompt 필요' }, 400)
+
+    const systemPrompt = `당신은 프로페셔널한 스포츠 클럽(배드민턴/테니스 등) 웹사이트 기획자 겸 카피라이터입니다.
+사용자의 짧은 설명을 듣고, 가장 매력적이고 세련된 홈페이지 설정 JSON을 생성하세요.
+
+응답 규칙:
+1. 반드시 아래 JSON 형식으로만 응답하세요. 마크다운이나 다른 설명 텍스트를 절대 붙이지 마세요.
+2. 테마 컬러(theme_color)는 클럽 분위기에 맞는 세련된 HEX 코드(예: #FF3B30, #007AFF, #34C759 등)를 추천해주세요.
+3. 홍보 문구(hero_title, hero_subtitle, about_text)는 사용자의 설명을 바탕으로 매우 트렌디하고 감성적인 카피를 작성하세요. (줄바꿈은 \\n 사용)
+
+응답할 JSON 구조:
+{
+  "theme_color": "#HEX코드",
+  "hero_title": "메인 타이틀 (짧고 강렬하게)",
+  "hero_subtitle": "서브 타이틀 (클럽의 성격이 잘 드러나는 문장)",
+  "hero_cta_primary": "기본 제공값: 가입 전 둘러보기",
+  "hero_cta_secondary": "기본 제공값: 이번 달 일정보기",
+  "show_schedule": true,
+  "show_notice": true,
+  "show_join_form": true,
+  "show_about": true,
+  "about_title": "소개 영역 제목",
+  "about_text": "소개글 내용 (3~4문장으로 신뢰감 있게 포장, 단체의 역사나 열정을 상상해서 덧붙여도 됨)"
+}`
+
+    try {
+        const aiResponse = await c.env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: prompt }
+            ],
+            max_tokens: 1024,
+            temperature: 0.7
+        })
+
+        const responseText = aiResponse.response || ''
+        let parsed = null
+
+        try {
+            const jsonMatch = responseText.match(/\{[\s\S]*\}/m)
+            if (jsonMatch) parsed = JSON.parse(jsonMatch[0])
+        } catch (e) { }
+
+        if (!parsed) {
+            return c.json({ success: false, error: 'AI가 올바른 형식을 생성하지 못했습니다.' })
+        }
+
+        return c.json({ success: true, config: parsed })
+    } catch (err: any) {
+        return c.json({ success: false, error: err.message || 'AI 연동 중 오류가 발생했습니다.' })
+    }
+})
+
 export default app

@@ -1205,6 +1205,13 @@ async function manageOrg(id) {
           <label>단체 계좌번호</label>
           <input class="form-control" id="moBank" placeholder="예: 국민 1234-56-7890" value="${org.bank_account || ''}">
         </div>
+
+        <div style="margin-top:24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius:12px; padding:20px; color:#fff;">
+          <h4 style="font-size:1rem; margin-bottom:6px;">🌐 공개 홈페이지 커스터마이징</h4>
+          <p style="font-size:0.85rem; opacity:0.9; margin-bottom:12px;">히어로 문구, 섹션 표시, 연락처, SNS 등을 수정할 수 있습니다.</p>
+          <button class="btn" style="background:rgba(255,255,255,0.2); color:#fff; border:1px solid rgba(255,255,255,0.4); width:100%; font-weight:bold; backdrop-filter:blur(4px);" onclick="closeModal(); openSiteEditor('${org.id}', '${org.slug}')">✏️ 사이트 에디터 열기</button>
+        </div>
+
         <div style="margin-top:40px; border-top:1px solid #e2e8f0; padding-top:20px;" id="orgAdminCredsSection">
           <h4 style="font-size:1rem; margin-bottom:8px;">🔐 단체 전용 로그인 계정 관리</h4>
           <p style="color:#64748b; font-size:0.85rem; margin-bottom:12px;">최고관리자 권한으로 단체 로그인 계정 정보를 확인하고 초기화할 수 있습니다.</p>
@@ -1256,6 +1263,281 @@ async function manageOrg(id) {
     showToast('설정 정보를 불러오지 못했습니다.', 'error');
   }
 }
+
+// ===== 🌐 사이트 에디터 (Site Editor) =====
+async function openSiteEditor(orgId, slug) {
+  const appEl = document.getElementById('app');
+  appEl.innerHTML = `<div style="display:flex;justify-content:center;align-items:center;height:60vh;color:var(--muted)">사이트 설정 로드 중...</div>`;
+
+  let cfg;
+  try {
+    cfg = await apiFetch('/api/orgs', '/' + orgId + '/site-config');
+  } catch (e) {
+    showToast('사이트 설정을 불러오지 못했습니다: ' + e.message, 'error');
+    renderApp();
+    return;
+  }
+
+  const field = (id, label, val, type = 'text', ph = '') =>
+    `<div class="se-field">
+      <label class="se-label">${label}</label>
+      ${type === 'textarea'
+      ? `<textarea class="se-input" id="${id}" rows="3" placeholder="${ph}">${val || ''}</textarea>`
+      : type === 'color'
+        ? `<input class="se-input se-color" type="color" id="${id}" value="${val || '#C8FF00'}">`
+        : `<input class="se-input" type="${type}" id="${id}" value="${val || ''}" placeholder="${ph}">`
+    }
+    </div>`;
+
+  const toggle = (id, label, checked) =>
+    `<div class="se-toggle-row">
+      <span>${label}</span>
+      <label class="se-switch">
+        <input type="checkbox" id="${id}" ${checked ? 'checked' : ''}>
+        <span class="se-slider"></span>
+      </label>
+    </div>`;
+
+  appEl.innerHTML = `
+    <style>
+      .se-wrap{max-width:900px;margin:0 auto;padding:24px 16px 80px}
+      .se-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+      .se-header h2{font-size:1.4rem;font-weight:800;margin:0}
+      .se-btns{display:flex;gap:8px}
+      .se-card{background:var(--card,#1a1a2e);border:1px solid var(--border,#2a2a4a);border-radius:14px;padding:20px;margin-bottom:16px}
+      .se-card h3{font-size:1rem;font-weight:700;margin:0 0 14px;display:flex;align-items:center;gap:8px}
+      .se-field{margin-bottom:14px}
+      .se-label{display:block;font-size:.8rem;color:var(--muted,#888);margin-bottom:4px;font-weight:600}
+      .se-input{width:100%;padding:10px 12px;border:1px solid var(--border,#2a2a4a);border-radius:8px;background:var(--bg,#0d0d1a);color:var(--text,#fff);font-size:.9rem;transition:border .2s}
+      .se-input:focus{border-color:var(--accent,#C8FF00);outline:none}
+      .se-color{height:44px;padding:4px;cursor:pointer}
+      textarea.se-input{resize:vertical;font-family:inherit}
+      .se-toggle-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border,#2a2a4a)}
+      .se-toggle-row:last-child{border-bottom:none}
+      .se-switch{position:relative;width:44px;height:24px;flex-shrink:0}
+      .se-switch input{opacity:0;width:0;height:0}
+      .se-slider{position:absolute;cursor:pointer;inset:0;background:#333;border-radius:24px;transition:.3s}
+      .se-slider::before{content:'';position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+      .se-switch input:checked+.se-slider{background:var(--accent,#C8FF00)}
+      .se-switch input:checked+.se-slider::before{transform:translateX(20px);background:#000}
+      .se-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+      @media(max-width:600px){.se-grid2{grid-template-columns:1fr}}
+      .se-preview-btn{margin-top:12px;display:inline-block;padding:8px 16px;background:var(--accent,#C8FF00);color:#000;border-radius:8px;text-decoration:none;font-weight:700;font-size:.85rem;transition:transform .2s}
+      .se-preview-btn:hover{transform:scale(1.03)}
+      .se-save{padding:12px 32px;background:var(--accent,#C8FF00);color:#000;border:none;border-radius:10px;font-weight:800;font-size:1rem;cursor:pointer;transition:all .2s}
+      .se-save:hover{transform:scale(1.04);box-shadow:0 4px 20px rgba(200,255,0,.3)}
+      .se-save:disabled{opacity:.5;cursor:not-allowed;transform:none}
+      .se-back{padding:10px 20px;background:var(--card,#1a1a2e);color:var(--text,#fff);border:1px solid var(--border,#2a2a4a);border-radius:10px;cursor:pointer;font-weight:600}
+    </style>
+
+    <div class="se-wrap">
+      <div class="se-header">
+        <h2 style="display:flex;align-items:center;gap:8px;">🌐 사이트 에디터 <button onclick="openAiSiteBuilder()" style="background:linear-gradient(45deg,#ff007f,#7928ca);color:#fff;border:none;border-radius:20px;padding:4px 12px;font-size:0.8rem;cursor:pointer;font-weight:bold;margin-left:12px;animation: pulse 2s infinite;">✨ AI 자동 완성</button></h2>
+        <div class="se-btns">
+          <button class="se-back" onclick="renderApp()">← 돌아가기</button>
+          <button class="se-save" id="seSaveBtn" onclick="saveSiteConfig('${orgId}')">💾 저장</button>
+        </div>
+      </div>
+
+      <!-- AI 빌더 모달 (기본 숨김) -->
+      <div id="aiBuilderModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+        <div style="background:var(--card,#1a1a2e);border:1px solid #7928ca;border-radius:16px;padding:24px;width:100%;max-width:500px;box-shadow:0 10px 40px rgba(121,40,202,0.3);">
+          <h3 style="margin:0 0 16px;font-size:1.2rem;color:#fff;">✨ AI에게 사이트 기획 맡기기</h3>
+          <p style="font-size:0.9rem;color:var(--muted);margin-bottom:16px;">클럽에 대해 자유롭게 설명해주세요. AI가 매력적인 제목, 소개글, 테마 컬러를 자동으로 만들어줍니다.</p>
+          <textarea id="aiPrompt" rows="4" style="width:100%;padding:12px;border-radius:8px;background:var(--bg);color:#fff;border:1px solid var(--border);margin-bottom:16px;font-family:inherit;resize:vertical;" placeholder="예) 강남구 2030 배드민턴 소모임이야. 주말 아침마다 상쾌하게 운동하는 활기차고 따뜻한 분위기야. 초보도 환영해!"></textarea>
+          <div style="display:flex;gap:12px;justify-content:flex-end;">
+            <button class="btn" style="background:transparent;color:var(--muted);border:1px solid var(--border);" onclick="document.getElementById('aiBuilderModal').style.display='none'">취소</button>
+            <button class="btn" id="btnRunAi" style="background:#7928ca;color:#fff;border:none;font-weight:bold;" onclick="runAiSiteBuilder()">🪄 생성하기</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 미리보기 -->
+      <div class="se-card" style="background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:#fff;text-align:center;padding:24px">
+        <p style="font-size:.85rem;opacity:.8;margin-bottom:8px">변경사항을 저장하면 공개 페이지에 즉시 반영됩니다</p>
+        <a class="se-preview-btn" href="/org/${slug}" target="_blank" style="background:#fff;color:#764ba2">🔗 현재 사이트 보기 →</a>
+      </div>
+
+      <!-- 테마 & 기본 -->
+      <div class="se-card">
+        <h3>🎨 테마 설정</h3>
+        ${field('seThemeColor', '테마 컬러 (액센트 색상)', cfg.theme_color, 'color')}
+      </div>
+
+      <!-- 히어로 섹션 -->
+      <div class="se-card">
+        <h3>✨ 히어로 (메인 배너)</h3>
+        ${field('seHeroTitle', '메인 타이틀', cfg.hero_title, 'text', '단체명 또는 슬로건')}
+        ${field('seHeroSub', '서브 타이틀 (줄바꿈: \\n)', cfg.hero_subtitle, 'textarea', '함께 뛰고, 함께 성장하는 커뮤니티')}
+        <div class="se-grid2">
+          ${field('seCtaPrimary', 'CTA 버튼 (메인)', cfg.hero_cta_primary, 'text', '가입 신청하기')}
+          ${field('seCtaSecondary', 'CTA 버튼 (보조)', cfg.hero_cta_secondary, 'text', '일정 보기')}
+        </div>
+      </div>
+
+      <!-- 섹션 표시 토글 -->
+      <div class="se-card">
+        <h3>📦 섹션 표시 여부</h3>
+        ${toggle('seShowSchedule', '📅 일정 섹션', cfg.show_schedule)}
+        ${toggle('seShowNotice', '📋 공지사항 섹션', cfg.show_notice)}
+        ${toggle('seShowJoin', '🚀 가입 신청 섹션', cfg.show_join_form)}
+        ${toggle('seShowAbout', 'ℹ️ 소개 섹션', cfg.show_about)}
+      </div>
+
+      <!-- 소개 섹션 -->
+      <div class="se-card">
+        <h3>ℹ️ 소개 섹션 내용</h3>
+        ${field('seAboutTitle', '섹션 제목', cfg.about_title, 'text', '소개')}
+        ${field('seAboutText', '소개 내용 (줄바꿈: \\n)', cfg.about_text, 'textarea', '단체에 대한 소개글을 작성하세요')}
+      </div>
+
+      <!-- 연락처 -->
+      <div class="se-card">
+        <h3>📞 연락처 정보</h3>
+        <div class="se-grid2">
+          ${field('seContactPhone', '전화번호', cfg.contact_phone, 'tel', '010-1234-5678')}
+          ${field('seContactEmail', '이메일', cfg.contact_email, 'email', 'info@example.com')}
+        </div>
+        ${field('seContactAddr', '주소', cfg.contact_address, 'text', '서울시 강남구 ...')}
+      </div>
+
+      <!-- SNS -->
+      <div class="se-card">
+        <h3>🔗 SNS 링크</h3>
+        ${field('seSnsInsta', '인스타그램 URL', cfg.sns_instagram, 'url', 'https://instagram.com/...')}
+        ${field('seSnsBlog', '블로그 URL', cfg.sns_blog, 'url', 'https://blog.naver.com/...')}
+        ${field('seSnsYoutube', '유튜브 URL', cfg.sns_youtube, 'url', 'https://youtube.com/@...')}
+      </div>
+
+      <!-- 푸터 -->
+      <div class="se-card">
+        <h3>📝 푸터 (Footer)</h3>
+        ${field('seFooterText', '푸터 추가 텍스트', cfg.footer_text, 'text', '© 2026 All rights reserved')}
+      </div>
+
+      <!-- 하단 저장 -->
+      <div style="text-align:center;margin-top:24px">
+        <button class="se-save" onclick="saveSiteConfig('${orgId}')" style="padding:14px 48px;font-size:1.1rem">💾 변경사항 저장</button>
+      </div>
+    </div>
+  `;
+}
+
+async function saveSiteConfig(orgId) {
+  const btn = document.getElementById('seSaveBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '저장 중...'; }
+
+  const v = id => {
+    const el = document.getElementById(id);
+    if (!el) return '';
+    return el.type === 'checkbox' ? el.checked : el.value;
+  };
+
+  const payload = {
+    theme_color: v('seThemeColor'),
+    hero_title: v('seHeroTitle'),
+    hero_subtitle: v('seHeroSub'),
+    hero_cta_primary: v('seCtaPrimary'),
+    hero_cta_secondary: v('seCtaSecondary'),
+    show_schedule: v('seShowSchedule'),
+    show_notice: v('seShowNotice'),
+    show_join_form: v('seShowJoin'),
+    show_about: v('seShowAbout'),
+    about_title: v('seAboutTitle'),
+    about_text: v('seAboutText'),
+    contact_phone: v('seContactPhone'),
+    contact_email: v('seContactEmail'),
+    contact_address: v('seContactAddr'),
+    sns_instagram: v('seSnsInsta'),
+    sns_blog: v('seSnsBlog'),
+    sns_youtube: v('seSnsYoutube'),
+    footer_text: v('seFooterText')
+  };
+
+  try {
+    await apiFetch('/api/orgs', '/' + orgId + '/site-config', {
+      method: 'PUT',
+      body: payload
+    });
+    showToast('사이트 설정이 저장되었습니다! 🎉', 'success');
+  } catch (e) {
+    showToast('저장 실패: ' + e.message, 'error');
+  }
+
+  if (btn) { btn.disabled = false; btn.textContent = '💾 저장'; }
+}
+
+window.openSiteEditor = openSiteEditor;
+window.saveSiteConfig = saveSiteConfig;
+
+window.openAiSiteBuilder = function () {
+  const modal = document.getElementById('aiBuilderModal');
+  if (modal) {
+    modal.style.display = 'flex';
+    document.getElementById('aiPrompt').focus();
+  }
+};
+
+window.runAiSiteBuilder = async function () {
+  const promptEl = document.getElementById('aiPrompt');
+  const btn = document.getElementById('btnRunAi');
+  if (!promptEl || !btn) return;
+
+  const prompt = promptEl.value.trim();
+  if (!prompt) { showToast('어떤 사이트를 만들고 싶으신지 짧게라도 적어주세요!', 'error'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '✨ 기획/작성 중...';
+
+  try {
+    const res = await apiFetch('/api/ai', '/build-site', {
+      method: 'POST',
+      body: { prompt }
+    });
+
+    if (res.success && res.config) {
+      const cfg = res.config;
+
+      const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el && val !== undefined && val !== null) {
+          if (el.type === 'checkbox') el.checked = !!val;
+          else el.value = val;
+        }
+      };
+
+      setVal('seThemeColor', cfg.theme_color);
+      setVal('seHeroTitle', cfg.hero_title);
+      setVal('seHeroSub', cfg.hero_subtitle);
+      setVal('seCtaPrimary', cfg.hero_cta_primary);
+      setVal('seCtaSecondary', cfg.hero_cta_secondary);
+      setVal('seShowSchedule', cfg.show_schedule);
+      setVal('seShowNotice', cfg.show_notice);
+      setVal('seShowJoin', cfg.show_join_form);
+      setVal('seShowAbout', cfg.show_about);
+      setVal('seAboutTitle', cfg.about_title);
+      setVal('seAboutText', cfg.about_text);
+
+      showToast('✨ AI가 사이트 설정을 채워주었습니다! 내용을 확인하고 저장해주세요.', 'success');
+      document.getElementById('aiBuilderModal').style.display = 'none';
+
+      // 약간의 애니메이션 효과 (폼 전체가 깜빡임)
+      const wrap = document.querySelector('.se-wrap');
+      if (wrap) {
+        wrap.style.transition = 'opacity 0.5s';
+        wrap.style.opacity = '0.3';
+        setTimeout(() => wrap.style.opacity = '1', 500);
+      }
+    } else {
+      showToast(res.error || 'AI 사이트 생성에 실패했습니다.', 'error');
+    }
+  } catch (e) {
+    showToast('네트워크 오류: ' + e.message, 'error');
+  }
+
+  btn.disabled = false;
+  btn.textContent = '🪄 생성하기';
+};
 
 window.fetchOrgCreds = async function (orgId) {
   const container = document.getElementById('orgCredsContainer');

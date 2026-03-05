@@ -1428,6 +1428,74 @@ orgs.delete('/:id/match-records/:recordId', requireAuth, async (c) => {
     }
 })
 
+// ── 사이트 편집기 (Site Config) ──────────────────────────────────
+
+// 사이트 설정 조회
+orgs.get('/:id/site-config', requireAuth, async (c) => {
+    try {
+        const orgId = parseInt(c.req.param('id'), 10)
+        const org = await c.env.DB.prepare('SELECT site_config, name, sport_type, theme_color, slug FROM organizations WHERE id = ?').bind(orgId).first() as any
+        if (!org) return c.json({ error: '단체를 찾을 수 없습니다.' }, 404)
+
+        let config: any = {}
+        try { config = JSON.parse(org.site_config || '{}') } catch (e) { }
+
+        // 기본값 병합
+        const defaults = {
+            hero_title: org.name || '',
+            hero_subtitle: '함께 뛰고, 함께 성장하는 커뮤니티.\\n당신의 시작을 응원합니다.',
+            hero_cta_primary: '가입 신청하기',
+            hero_cta_secondary: '일정 보기',
+            show_schedule: true,
+            show_notice: true,
+            show_join_form: true,
+            show_about: false,
+            about_title: '소개',
+            about_text: '',
+            contact_phone: '',
+            contact_address: '',
+            contact_email: '',
+            sns_instagram: '',
+            sns_blog: '',
+            sns_youtube: '',
+            footer_text: '',
+            template_id: 'developer'
+        }
+        return c.json({ ...defaults, ...config, slug: org.slug, sport_type: org.sport_type, theme_color: org.theme_color })
+    } catch (e) {
+        return c.json({ error: (e as Error).message }, 500)
+    }
+})
+
+// 사이트 설정 저장
+orgs.put('/:id/site-config', requireAuth, async (c) => {
+    try {
+        const orgId = parseInt(c.req.param('id'), 10)
+        const b = await c.req.json()
+
+        // theme_color는 organizations 테이블에 직접 저장
+        if (b.theme_color) {
+            await c.env.DB.prepare('UPDATE organizations SET theme_color = ? WHERE id = ?').bind(b.theme_color, orgId).run()
+        }
+
+        // 나머지는 site_config JSON으로
+        const configFields = ['hero_title', 'hero_subtitle', 'hero_cta_primary', 'hero_cta_secondary',
+            'show_schedule', 'show_notice', 'show_join_form', 'show_about',
+            'about_title', 'about_text', 'contact_phone', 'contact_address', 'contact_email',
+            'sns_instagram', 'sns_blog', 'sns_youtube', 'footer_text', 'template_id']
+
+        const config: any = {}
+        for (const f of configFields) {
+            if (b[f] !== undefined) config[f] = b[f]
+        }
+
+        await c.env.DB.prepare('UPDATE organizations SET site_config = ? WHERE id = ?').bind(JSON.stringify(config), orgId).run()
+        return c.json({ message: '사이트 설정이 저장되었습니다!' })
+    } catch (e) {
+        return c.json({ error: (e as Error).message }, 500)
+    }
+})
+
 // ── 단체 게시판 관리 (Boards & Posts) ───────────────────────────────────
 
 // 1. 게시판 목록 조회
@@ -1725,4 +1793,63 @@ orgs.get('/:id/inventory/logs', requireAuth, async (c) => {
     }
 })
 
+// ── 사이트 설정 (site_config) 조회 ──
+orgs.get('/:id/site-config', requireAuth, async (c) => {
+    const id = c.req.param('id')
+    try {
+        const org = await c.env.DB.prepare('SELECT id, name, sport_type, theme_color, site_config FROM organizations WHERE id = ?').bind(id).first() as any
+        if (!org) return c.json({ error: 'Not found' }, 404)
+
+        let sc: any = {}
+        try { sc = JSON.parse(org.site_config || '{}') } catch (e) { }
+
+        const defaults = {
+            hero_title: org.name || '',
+            hero_subtitle: '',
+            hero_cta_primary: '가입 신청하기',
+            hero_cta_secondary: '일정 보기',
+            show_schedule: true,
+            show_notice: true,
+            show_join_form: true,
+            show_about: false,
+            about_title: '소개',
+            about_text: '',
+            contact_phone: '',
+            contact_address: '',
+            contact_email: '',
+            sns_instagram: '',
+            sns_blog: '',
+            sns_youtube: '',
+            footer_text: ''
+        }
+
+        return c.json({ ...defaults, ...sc, theme_color: org.theme_color || '#C8FF00' })
+    } catch (e) {
+        return c.json({ error: (e as Error).message }, 500)
+    }
+})
+
+// ── 사이트 설정 (site_config) 저장 ──
+orgs.put('/:id/site-config', requireAuth, async (c) => {
+    const id = c.req.param('id')
+    try {
+        const body = await c.req.json() as any
+        const { theme_color, ...siteConfig } = body
+        const siteConfigJson = JSON.stringify(siteConfig)
+
+        if (theme_color) {
+            await c.env.DB.prepare('UPDATE organizations SET site_config = ?, theme_color = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+                .bind(siteConfigJson, theme_color, id).run()
+        } else {
+            await c.env.DB.prepare('UPDATE organizations SET site_config = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+                .bind(siteConfigJson, id).run()
+        }
+
+        return c.json({ success: true })
+    } catch (e) {
+        return c.json({ error: (e as Error).message }, 500)
+    }
+})
+
 export default orgs
+

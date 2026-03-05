@@ -216,12 +216,12 @@ app.get('/', (c) => {
   </script>
 
   <!-- Script Resources -->
-  <script src="/static/app.js?v=20260304c"></script>
-  <script src="/static/members.js?v=20260304c"></script>
-  <script src="/static/auth.js?v=20260304c"></script>
-  <script src="/static/ranking.js?v=20260304c"></script>
-  <script src="/static/report.js?v=20260304c"></script>
-  <script src="/static/broadcast.js?v=20260304c"></script>
+  <script src="/static/app.js?v=20260306_AI"></script>
+  <script src="/static/members.js?v=20260306_AI"></script>
+  <script src="/static/auth.js?v=20260306_AI"></script>
+  <script src="/static/ranking.js?v=20260306_AI"></script>
+  <script src="/static/report.js?v=20260306_AI"></script>
+  <script src="/static/broadcast.js?v=20260306_AI"></script>
 ${renderSWAndEnd()}
 `)
 })
@@ -245,24 +245,49 @@ app.get('/org/:slug', async (c) => {
   const levelLabel = levelLabels[orgLevel] || '단체'
   const region = org.region || ''
 
+  // site_config 파싱
+  let sc: any = {}
+  try { sc = JSON.parse(org.site_config || '{}') } catch (e) { }
+  const heroTitle = sc.hero_title || orgName
+  const heroSub = (sc.hero_subtitle || `함께 뛰고, 함께 성장하는 ${sportLabel} 커뮤니티.\n당신의 시작을 응원합니다.`).replace(/\n/g, '<br>')
+  const ctaPrimary = sc.hero_cta_primary || '가입 신청하기'
+  const ctaSecondary = sc.hero_cta_secondary || '일정 보기'
+  const showSchedule = sc.show_schedule !== false
+  const showNotice = sc.show_notice !== false
+  const showJoinForm = sc.show_join_form !== false
+  const showAbout = sc.show_about === true
+  const aboutTitle = sc.about_title || '소개'
+  const aboutText = (sc.about_text || '').replace(/\n/g, '<br>')
+  const contactPhone = sc.contact_phone || ''
+  const contactAddr = sc.contact_address || ''
+  const contactEmail = sc.contact_email || ''
+  const snsInsta = sc.sns_instagram || ''
+  const snsBlog = sc.sns_blog || ''
+  const snsYoutube = sc.sns_youtube || ''
+  const footerText = sc.footer_text || ''
+
   // 최근 일정
   let schedulesHtml = ''
-  try {
-    const { results: schedules } = await c.env.DB.prepare(`SELECT * FROM schedules WHERE org_id = ? ORDER BY start_time DESC LIMIT 5`).bind(org.id).all() as any
-    schedulesHtml = (schedules || []).map((s: any) => {
-      const d = new Date(s.start_time)
-      return `<div class="os-card"><div class="os-date">${d.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}</div><div class="os-info"><strong>${s.title}</strong><span>${s.location || ''}</span></div></div>`
-    }).join('')
-  } catch (e) { }
+  if (showSchedule) {
+    try {
+      const { results: schedules } = await c.env.DB.prepare(`SELECT * FROM schedules WHERE org_id = ? ORDER BY start_time DESC LIMIT 5`).bind(org.id).all() as any
+      schedulesHtml = (schedules || []).map((s: any) => {
+        const d = new Date(s.start_time)
+        return `<div class="os-card"><div class="os-date">${d.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}</div><div class="os-info"><strong>${s.title}</strong><span>${s.location || ''}</span></div></div>`
+      }).join('')
+    } catch (e) { }
+  }
 
   // 최근 공지
   let noticesHtml = ''
-  try {
-    const { results: posts } = await c.env.DB.prepare(`SELECT p.*, b.name as board_name FROM org_posts p JOIN org_boards b ON p.board_id = b.id WHERE p.org_id = ? ORDER BY p.is_pinned DESC, p.created_at DESC LIMIT 5`).bind(org.id).all() as any
-    noticesHtml = (posts || []).map((p: any) => {
-      return `<div class="os-notice"><span class="os-ntag">${p.is_pinned ? '📌' : '💬'}</span><strong>${p.title}</strong><span class="os-ndate">${new Date(p.created_at).toLocaleDateString()}</span></div>`
-    }).join('')
-  } catch (e) { }
+  if (showNotice) {
+    try {
+      const { results: posts } = await c.env.DB.prepare(`SELECT p.*, b.name as board_name FROM org_posts p JOIN org_boards b ON p.board_id = b.id WHERE p.org_id = ? ORDER BY p.is_pinned DESC, p.created_at DESC LIMIT 5`).bind(org.id).all() as any
+      noticesHtml = (posts || []).map((p: any) => {
+        return `<div class="os-notice"><span class="os-ntag">${p.is_pinned ? '📌' : '💬'}</span><strong>${p.title}</strong><span class="os-ndate">${new Date(p.created_at).toLocaleDateString()}</span></div>`
+      }).join('')
+    } catch (e) { }
+  }
 
   // 회원 수
   let memberCount = 0
@@ -391,11 +416,11 @@ app.get('/org/:slug', async (c) => {
     <div class="hero-overlay"></div>
     <div class="hero-content">
       <div class="hero-badge">${sportLabel} <span>${levelLabel}</span>${region ? ' · ' + region : ''}</div>
-      <h1 class="hero-title">${orgName.split(' ').map((w: string, i: number) => i === 0 ? `<em>${w}</em>` : w).join(' ')}</h1>
-      <p class="hero-sub">함께 뛰고, 함께 성장하는 ${sportType === 'tennis' ? '테니스' : '배드민턴'} 커뮤니티.<br>당신의 시작을 응원합니다.</p>
+      <h1 class="hero-title">${heroTitle.split(' ').map((w: string, i: number) => i === 0 ? `<em>${w}</em>` : w).join(' ')}</h1>
+      <p class="hero-sub">${heroSub}</p>
       <div class="hero-cta">
-        <a href="#join"><button class="btn-primary">가입 신청하기</button></a>
-        <a href="#schedule"><button class="btn-outline">일정 보기</button></a>
+        ${showJoinForm ? `<a href="#join"><button class="btn-primary">${ctaPrimary}</button></a>` : ''}
+        ${showSchedule ? `<a href="#schedule"><button class="btn-outline">${ctaSecondary}</button></a>` : ''}
       </div>
     </div>
   </section>
@@ -408,14 +433,37 @@ app.get('/org/:slug', async (c) => {
     <div class="stat-item"><div class="stat-num">PRO</div><div class="stat-label">Match Point</div></div>
   </div>
 
+  ${showAbout ? `
+  <!-- About Section -->
+  <section class="section fade-up" id="about">
+    <div class="section-label">About</div>
+    <h2 class="section-title">${aboutTitle}</h2>
+    <div style="color:var(--muted);line-height:1.8;font-size:1rem;max-width:800px;">${aboutText || '단체 소개가 아직 작성되지 않았습니다.'}</div>
+    ${contactPhone || contactAddr || contactEmail ? `
+    <div style="margin-top:30px;display:flex;gap:24px;flex-wrap:wrap;font-size:0.9rem;color:var(--muted);">
+      ${contactPhone ? `<span>📞 ${contactPhone}</span>` : ''}
+      ${contactEmail ? `<span>📧 ${contactEmail}</span>` : ''}
+      ${contactAddr ? `<span>📍 ${contactAddr}</span>` : ''}
+    </div>` : ''}
+    ${snsInsta || snsBlog || snsYoutube ? `
+    <div style="margin-top:16px;display:flex;gap:16px;">
+      ${snsInsta ? `<a href="${snsInsta}" target="_blank" style="color:var(--accent);font-size:0.85rem;">Instagram</a>` : ''}
+      ${snsBlog ? `<a href="${snsBlog}" target="_blank" style="color:var(--accent);font-size:0.85rem;">Blog</a>` : ''}
+      ${snsYoutube ? `<a href="${snsYoutube}" target="_blank" style="color:var(--accent);font-size:0.85rem;">YouTube</a>` : ''}
+    </div>` : ''}
+  </section>
+  ` : ''}
+
+  ${showSchedule ? `
   <!-- Schedule Section -->
   <section class="section fade-up" id="schedule">
     <div class="section-label">Schedule</div>
     <h2 class="section-title">다가오는 일정</h2>
     <p class="section-desc">정기 모임, 대회, 훈련 등의 일정을 확인하세요.</p>
     ${schedulesHtml || '<div style="color:var(--muted);padding:40px;text-align:center;background:var(--card);border-radius:12px;">등록된 일정이 없습니다.</div>'}
-  </section>
+  </section>` : ''}
 
+  ${showNotice ? `
   <!-- Notice Section -->
   <section class="section fade-up" id="notice" style="padding-top:40px">
     <div class="section-label">Announcements</div>
@@ -424,8 +472,9 @@ app.get('/org/:slug', async (c) => {
     <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
       ${noticesHtml || '<div style="color:var(--muted);padding:40px;text-align:center;">등록된 공지가 없습니다.</div>'}
     </div>
-  </section>
+  </section>` : ''}
 
+  ${showJoinForm ? `
   <!-- CTA Join Section -->
   <section class="cta-section fade-up" id="join">
     <div class="section-label">Join Us</div>
@@ -436,32 +485,28 @@ app.get('/org/:slug', async (c) => {
       <input type="tel" id="jfPhone" placeholder="연락처 (010-0000-0000)">
       <select id="jfGender"><option value="">성별 선택</option><option value="M">남성</option><option value="F">여성</option></select>
       <input type="text" id="jfMessage" placeholder="하고 싶은 말 (선택사항)">
-      <button onclick="submitJoinRequest()">🚀 가입 신청하기</button>
+      <button onclick="submitJoinRequest()">🚀 ${ctaPrimary}</button>
       <p style="font-size:0.75rem;color:var(--muted);margin-top:8px;">제출된 정보는 가입 심사 외 다른 용도로 사용되지 않습니다.</p>
     </div>
-  </section>
+  </section>` : ''}
 
   <!-- Footer -->
   <footer class="org-footer">
     <p style="margin-bottom:8px;"><strong style="color:var(--accent)">${orgName}</strong></p>
+    ${footerText ? `<p style="color:#777;margin-bottom:8px;">${footerText}</p>` : ''}
     <p>Powered by <a href="/" target="_blank">Match Point</a> — 스포츠 대회 운영 플랫폼</p>
     <p style="margin-top:4px;">&copy; ${new Date().getFullYear()} All Rights Reserved.</p>
   </footer>
 
   <script>
-    // Scroll nav effect
     window.addEventListener('scroll',()=>{
       document.getElementById('orgNav').classList.toggle('scrolled',window.scrollY>50)
     });
-    // Fade-up animations
     const obs=new IntersectionObserver((entries)=>{entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible')})},{threshold:0.1});
     document.querySelectorAll('.fade-up').forEach(el=>obs.observe(el));
-    // Smooth scroll
-    document.querySelectorAll('a[href^="#"]').forEach(a=>{a.addEventListener('click',e=>{e.preventDefault();document.querySelector(a.getAttribute('href')).scrollIntoView({behavior:'smooth'})})});
-    // Join form submit
+    document.querySelectorAll('a[href^="#"]').forEach(a=>{a.addEventListener('click',e=>{e.preventDefault();const t=document.querySelector(a.getAttribute('href'));if(t)t.scrollIntoView({behavior:'smooth'})})});
     function submitJoinRequest(){
       const name=document.getElementById('jfName').value.trim();
-      const phone=document.getElementById('jfPhone').value.trim();
       if(!name){alert('이름을 입력해주세요.');return}
       alert(name+'님, 가입 신청이 완료되었습니다!\\n관리자 확인 후 연락드리겠습니다.');
       document.querySelectorAll('.join-form input,.join-form select').forEach(el=>el.value='');
@@ -486,17 +531,17 @@ app.get('/r/:id', async (c) => {
   // 순위 데이터
   const { results: standings } = await c.env.DB.prepare(`
     SELECT s.*, t2.team_name,
-  p1.name AS p1_name, p1.level AS p1_level, p1.club AS p1_club,
+    p1.name AS p1_name, p1.level AS p1_level, p1.club AS p1_club,
     p2.name AS p2_name, p2.level AS p2_level, p2.club AS p2_club,
-      e.name AS event_name
+    e.name AS event_name
     FROM standings s
     JOIN teams  t2  ON s.team_id = t2.id
     JOIN events e   ON s.event_id = e.id
     JOIN participants p1 ON t2.player1_id = p1.id
     JOIN participants p2 ON t2.player2_id = p2.id
     WHERE t2.tournament_id = ?
-  ORDER BY s.event_id, t2.group_num, s.points DESC, s.goal_difference DESC
-  `).bind(id).all() as any
+    ORDER BY s.event_id, t2.group_num, s.points DESC, s.goal_difference DESC
+    `).bind(id).all() as any
 
   // 이벤트별 그룹핑
   const byEvent: Record<string, any[]> = {}
@@ -515,7 +560,7 @@ app.get('/r/:id', async (c) => {
   const medalIcon = (i: number) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1} 위`
 
   const standingsHtml = Object.entries(byEvent).map(([evtName, rows]) => `
-  < section class="rp-event" >
+    < section class="rp-event" >
       <h2 class="rp-event-title">${evtName}</h2>
       <div class="rp-table-wrap">
         <table class="rp-table">
@@ -536,28 +581,28 @@ app.get('/r/:id', async (c) => {
         </table>
       </div>
     </section >
-  `).join('')
+    `).join('')
 
   return c.html(`< !DOCTYPE html >
-  <html lang="ko">
-    <head>
-      <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>${title}</title>
-          <meta name="description" content="${desc}">
-            <link rel="canonical" href="${shareUrl}">
-              <!-- OG -->
-              <meta property="og:type" content="article">
-                <meta property="og:url" content="${shareUrl}">
-                  <meta property="og:title" content="${title}">
-                    <meta property="og:description" content="${desc}">
-                      <meta property="og:site_name" content="Match Point">
-                        <!-- Twitter -->
-                        <meta name="twitter:card" content="summary">
-                          <meta name="twitter:title" content="${title}">
-                            <meta name="twitter:description" content="${desc}">
-                              <!-- JSON-LD -->
-                              <script type="application/ld+json">${JSON.stringify({
+    <html lang="ko">
+      <head>
+        <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>${title}</title>
+            <meta name="description" content="${desc}">
+              <link rel="canonical" href="${shareUrl}">
+                <!-- OG -->
+                <meta property="og:type" content="article">
+                  <meta property="og:url" content="${shareUrl}">
+                    <meta property="og:title" content="${title}">
+                      <meta property="og:description" content="${desc}">
+                        <meta property="og:site_name" content="Match Point">
+                          <!-- Twitter -->
+                          <meta name="twitter:card" content="summary">
+                            <meta name="twitter:title" content="${title}">
+                              <meta name="twitter:description" content="${desc}">
+                                <!-- JSON-LD -->
+                                <script type="application/ld+json">${JSON.stringify({
     "@context": "https://schema.org",
     "@type": "SportsEvent",
     "name": t.name,
@@ -566,72 +611,72 @@ app.get('/r/:id', async (c) => {
     "sport": t.sport_type === 'tennis' ? 'Tennis' : 'Badminton',
     "eventStatus": t.status === 'completed' ? 'https://schema.org/EventScheduled' : 'https://schema.org/EventScheduled'
   })}</script>
-                              <link rel="preconnect" href="https://fonts.googleapis.com">
-                                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-                                  <style>
-                                    *{box - sizing:border-box;margin:0;padding:0}
-                                    body{font - family:'Inter',sans-serif;background:#f8fafc;color:#0f172a;min-height:100vh}
-                                    .rp-nav{background:#fff;border-bottom:1px solid #e2e8f0;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
-                                    .rp-logo{font - weight:900;font-size:1rem;color:#f97316;text-decoration:none}
-                                    .rp-back{font - size:0.85rem;color:#64748b;text-decoration:none;border:1px solid #e2e8f0;padding:6px 14px;border-radius:20px}
-                                    .rp-hero{background:linear-gradient(135deg,#f97316,#8b5cf6);padding:48px 20px 40px;text-align:center;color:#fff}
-                                    .rp-hero h1{font - size:clamp(1.6rem,4vw,2.8rem);font-weight:900;margin-bottom:12px;line-height:1.2}
-                                    .rp-hero .rp-meta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:16px}
-                                    .rp-hero .rp-badge{background:rgba(255,255,255,0.2);padding:6px 14px;border-radius:20px;font-size:0.85rem;font-weight:600}
-                                    .rp-share{display:flex;gap:8px;justify-content:center;margin-top:20px;flex-wrap:wrap}
-                                    .rp-share a{background:rgba(255,255,255,0.15);color:#fff;padding:8px 18px;border-radius:20px;text-decoration:none;font-size:0.85rem;font-weight:600;border:1px solid rgba(255,255,255,0.3);transition:background 0.2s}
-                                    .rp-share a:hover{background:rgba(255,255,255,0.3)}
-                                    .rp-body{max - width:900px;margin:0 auto;padding:32px 16px 60px}
-                                    .rp-event{background:#fff;border-radius:20px;padding:28px;margin-bottom:24px;box-shadow:0 4px 20px rgba(0,0,0,0.04)}
-                                    .rp-event-title{font - size:1.15rem;font-weight:800;color:#0f172a;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #f1f5f9}
-                                    .rp-table-wrap{overflow - x:auto}
-                                    .rp-table{width:100%;border-collapse:collapse;font-size:0.9rem}
-                                    .rp-table th{background:#f8fafc;padding:10px 12px;text-align:left;font-size:0.8rem;font-weight:700;color:#64748b;border-bottom:2px solid #e2e8f0}
-                                    .rp-table td{padding:11px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
-                                    .rp-top{background:rgba(249,115,22,0.03)}
-                                    .rp-rank{font - size:1.1rem;min-width:48px}
-                                    .rp-team strong{font - weight:700}
-                                    .rp-partner{color:#94a3b8;font-size:0.85rem}
-                                    .rp-club{color:#64748b;font-size:0.85rem}
-                                    .rp-record{font - weight:600;color:#334155}
-                                    .rp-pts{font - weight:800;color:#f97316}
-                                    .rp-empty{text - align:center;padding:40px;color:#94a3b8}
-                                    .rp-footer{text - align:center;padding:40px 20px;color:#94a3b8;font-size:0.85rem}
-                                    .rp-footer a{color:#f97316;text-decoration:none;font-weight:700}
-                                    @media(max-width:600px){.rp - club{display:none}.rp-table th:nth-child(3){display:none}}
-                                  </style>
-                                </head>
-                                <body>
-                                  <nav class="rp-nav">
-                                    <a href="/" class="rp-logo">🏆 Match Point</a>
-                                    <a href="/" class="rp-back">← 홈으로</a>
-                                  </nav>
+                                <link rel="preconnect" href="https://fonts.googleapis.com">
+                                  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+                                    <style>
+                                      *{box - sizing:border-box;margin:0;padding:0}
+                                      body{font - family:'Inter',sans-serif;background:#f8fafc;color:#0f172a;min-height:100vh}
+                                      .rp-nav{background:#fff;border-bottom:1px solid #e2e8f0;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+                                      .rp-logo{font - weight:900;font-size:1rem;color:#f97316;text-decoration:none}
+                                      .rp-back{font - size:0.85rem;color:#64748b;text-decoration:none;border:1px solid #e2e8f0;padding:6px 14px;border-radius:20px}
+                                      .rp-hero{background:linear-gradient(135deg,#f97316,#8b5cf6);padding:48px 20px 40px;text-align:center;color:#fff}
+                                      .rp-hero h1{font - size:clamp(1.6rem,4vw,2.8rem);font-weight:900;margin-bottom:12px;line-height:1.2}
+                                      .rp-hero .rp-meta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:16px}
+                                      .rp-hero .rp-badge{background:rgba(255,255,255,0.2);padding:6px 14px;border-radius:20px;font-size:0.85rem;font-weight:600}
+                                      .rp-share{display:flex;gap:8px;justify-content:center;margin-top:20px;flex-wrap:wrap}
+                                      .rp-share a{background:rgba(255,255,255,0.15);color:#fff;padding:8px 18px;border-radius:20px;text-decoration:none;font-size:0.85rem;font-weight:600;border:1px solid rgba(255,255,255,0.3);transition:background 0.2s}
+                                      .rp-share a:hover{background:rgba(255,255,255,0.3)}
+                                      .rp-body{max - width:900px;margin:0 auto;padding:32px 16px 60px}
+                                      .rp-event{background:#fff;border-radius:20px;padding:28px;margin-bottom:24px;box-shadow:0 4px 20px rgba(0,0,0,0.04)}
+                                      .rp-event-title{font - size:1.15rem;font-weight:800;color:#0f172a;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #f1f5f9}
+                                      .rp-table-wrap{overflow - x:auto}
+                                      .rp-table{width:100%;border-collapse:collapse;font-size:0.9rem}
+                                      .rp-table th{background:#f8fafc;padding:10px 12px;text-align:left;font-size:0.8rem;font-weight:700;color:#64748b;border-bottom:2px solid #e2e8f0}
+                                      .rp-table td{padding:11px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+                                      .rp-top{background:rgba(249,115,22,0.03)}
+                                      .rp-rank{font - size:1.1rem;min-width:48px}
+                                      .rp-team strong{font - weight:700}
+                                      .rp-partner{color:#94a3b8;font-size:0.85rem}
+                                      .rp-club{color:#64748b;font-size:0.85rem}
+                                      .rp-record{font - weight:600;color:#334155}
+                                      .rp-pts{font - weight:800;color:#f97316}
+                                      .rp-empty{text - align:center;padding:40px;color:#94a3b8}
+                                      .rp-footer{text - align:center;padding:40px 20px;color:#94a3b8;font-size:0.85rem}
+                                      .rp-footer a{color:#f97316;text-decoration:none;font-weight:700}
+                                      @media(max-width:600px){.rp - club{display:none}.rp-table th:nth-child(3){display:none}}
+                                    </style>
+                                  </head>
+                                  <body>
+                                    <nav class="rp-nav">
+                                      <a href="/" class="rp-logo">🏆 Match Point</a>
+                                      <a href="/" class="rp-back">← 홈으로</a>
+                                    </nav>
 
-                                  <header class="rp-hero">
-                                    <h1>${t.name}</h1>
-                                    <div class="rp-meta">
-                                      <span class="rp-badge">${sport}</span>
-                                      <span class="rp-badge">${status}</span>
-                                      ${t.date ? `<span class="rp-badge">📅 ${t.date}</span>` : ''}
-                                      <span class="rp-badge">🏟️ ${t.courts || 2}코트</span>
-                                    </div>
-                                    <div class="rp-share">
-                                      <a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}" target="_blank" rel="noopener">📘 Facebook 공유</a>
-                                      <a href="https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(title)}" target="_blank" rel="noopener">🐦 Twitter 공유</a>
-                                      <a href="https://api.kakaolink.sdk.kakao.com" onclick="if(navigator.share){navigator.share({title:'${title}',url:'${shareUrl}'});return false;}">📤 공유하기</a>
-                                    </div>
-                                  </header>
+                                    <header class="rp-hero">
+                                      <h1>${t.name}</h1>
+                                      <div class="rp-meta">
+                                        <span class="rp-badge">${sport}</span>
+                                        <span class="rp-badge">${status}</span>
+                                        ${t.date ? `<span class="rp-badge">📅 ${t.date}</span>` : ''}
+                                        <span class="rp-badge">🏟️ ${t.courts || 2}코트</span>
+                                      </div>
+                                      <div class="rp-share">
+                                        <a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}" target="_blank" rel="noopener">📘 Facebook 공유</a>
+                                        <a href="https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(title)}" target="_blank" rel="noopener">🐦 Twitter 공유</a>
+                                        <a href="https://api.kakaolink.sdk.kakao.com" onclick="if(navigator.share){navigator.share({title:'${title}',url:'${shareUrl}'});return false;}">📤 공유하기</a>
+                                      </div>
+                                    </header>
 
-                                  <main class="rp-body">
-                                    ${standingsHtml || '<div class="rp-empty">📊 아직 순위 데이터가 없습니다.</div>'}
-                                  </main>
+                                    <main class="rp-body">
+                                      ${standingsHtml || '<div class="rp-empty">📊 아직 순위 데이터가 없습니다.</div>'}
+                                    </main>
 
-                                  <footer class="rp-footer">
-                                    <p>이 대회는 <a href="/">Match Point</a>로 운영되었습니다.</p>
-                                    <p style="margin-top:8px"><a href="/">나도 무료로 대회 개설하기 →</a></p>
-                                  </footer>
-                                </body>
-                              </html>`)
+                                    <footer class="rp-footer">
+                                      <p>이 대회는 <a href="/">Match Point</a>로 운영되었습니다.</p>
+                                      <p style="margin-top:8px"><a href="/">나도 무료로 대회 개설하기 →</a></p>
+                                    </footer>
+                                  </body>
+                                </html>`)
 })
 
 // ── Sitemap XML ─────────────────────────────────────────────
@@ -650,9 +695,9 @@ app.get('/sitemap.xml', async (c) => {
     ].join('\n  ')
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
-                              <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-                                ${urls}
-                              </urlset>`
+                                <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+                                  ${urls}
+                                </urlset>`
 
     return new Response(xml, {
       headers: {
@@ -677,66 +722,66 @@ app.get('/sitemap', async (c) => {
       const badgeText = t.status === 'in_progress' ? '<span style="color:#22c55e;font-size:0.75rem;font-weight:700;padding:2px 6px;background:rgba(34,197,94,0.1);border-radius:10px;margin-left:8px;">진행중</span>' : (t.status === 'completed' ? '<span style="color:#64748b;font-size:0.75rem;font-weight:700;padding:2px 6px;background:#f1f5f9;border-radius:10px;margin-left:8px;">종료</span>' : '');
 
       return `<a href="/t?tid=${t.id}" style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; background:rgba(255,255,255,0.7); border-radius:16px; text-decoration:none; color:#1e293b; margin-bottom:12px; transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border:1px solid rgba(0,0,0,0.03);" onmouseover="this.style.background='#fff'; this.style.transform='translateY(-3px)'; this.style.boxShadow='0 10px 25px -5px rgba(0,0,0,0.05)'" onmouseout="this.style.background='rgba(255,255,255,0.7)'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
-                                <div style="font-weight:800; font-size:1.15rem; display:flex; align-items:center;">
-                                  <span style="font-size:1.4rem; margin-right:8px;">${icon}</span> ${t.name} ${badgeText}
-                                </div>
-                                <div style="display:flex; align-items:center; gap:16px;">
-                                  <div style="color:#64748b; font-size:0.9rem; font-weight:600;">${(t.created_at || '').slice(0, 10)}</div>
-                                  <span style="color:#e2e8f0;">❯</span>
-                                </div>
-                              </a>`
+                                  <div style="font-weight:800; font-size:1.15rem; display:flex; align-items:center;">
+                                    <span style="font-size:1.4rem; margin-right:8px;">${icon}</span> ${t.name} ${badgeText}
+                                  </div>
+                                  <div style="display:flex; align-items:center; gap:16px;">
+                                    <div style="color:#64748b; font-size:0.9rem; font-weight:600;">${(t.created_at || '').slice(0, 10)}</div>
+                                    <span style="color:#e2e8f0;">❯</span>
+                                  </div>
+                                </a>`
     }).join('')
 
     return c.html(`<!DOCTYPE html>
-                              <html lang="ko">
-                                <head>
-                                  ${commonHead}
-                                  <title>🗺️ 사이트맵 & 대회 디렉토리</title>
-                                  <meta name="description" content="MATCH POINT 시스템 사이트맵 및 전체 대회 검색">
-                                    <style>
-                                      body {background: #f8fafc; font-family: 'Pretendard', sans-serif; margin: 0; padding: 0; color: #0f172a; min-height: 100vh; }
-                                      .header-bg {background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 60px 20px 80px; color: #fff; text-align: center; position: relative; overflow: hidden; }
-                                      .header-bg::after {content:''; position:absolute; bottom:-50px; left:-10%; width:120%; height:100px; background:#f8fafc; transform:rotate(-2deg); }
-                                      .container {max - width: 900px; margin: -50px auto 60px; padding: 0 20px; position: relative; z-index: 10; }
-                                      .card {background: rgba(255,255,255,0.85); backdrop-filter: blur(20px); border-radius: 32px; padding: 50px; box-shadow: 0 20px 50px rgba(0,0,0,0.05); border: 1px solid rgba(255,255,255,1); }
-                                      .section-title {font - size: 1.5rem; font-weight: 800; color: #0f172a; margin-bottom: 24px; display: flex; align-items: center; gap: 10px; }
-                                      .nav-grid {display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 50px; }
-                                      .nav-grid a {background: #fff; padding: 24px; border-radius: 20px; text-decoration: none; color: #334155; font-weight: 800; font-size: 1.1rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; transition: all 0.3s; border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
-                                      .nav-grid a:hover {transform: translateY(-5px); box-shadow: 0 15px 30px rgba(14, 165, 233, 0.1); border-color: #e0f2fe; color: #0ea5e9; }
-                                      .nav-grid a span {font - size: 2.5rem; transition: transform 0.3s; }
-                                      .nav-grid a:hover span {transform: scale(1.1); }
-                                    </style>
-                                </head>
-                                <body>
-                                  <div class="header-bg">
-                                    <span style="display:inline-block; padding:6px 14px; background:rgba(255,255,255,0.1); border-radius:20px; font-weight:700; font-size:0.85rem; margin-bottom:16px;">사이트맵 / 디렉토리</span>
-                                    <h1 style="margin:0; font-size:3rem; font-weight:900; letter-spacing:-1px;">MATCH POINT 🗺️</h1>
-                                    <p style="color:#94a3b8; font-size:1.1rem; margin-top:16px; font-weight:500;">전체 시스템 메뉴 및 역대 대회 목록을 한눈에 살펴보세요</p>
-                                  </div>
-                                  <div class="container">
-                                    <div class="card">
-                                      <div class="section-title"><span style="font-size:1.8rem;">🧭</span> 빠른 글로벌 메뉴</div>
-                                      <div class="nav-grid">
-                                        <a href="/"><span>🏠</span> 메인 홈</a>
-                                        <a href="/court"><span>🏟️</span> 코트 점수판</a>
-                                        <a href="/dashboard"><span>📊</span> 라이브 대시보드</a>
-                                      </div>
+                                <html lang="ko">
+                                  <head>
+                                    ${commonHead}
+                                    <title>🗺️ 사이트맵 & 대회 디렉토리</title>
+                                    <meta name="description" content="MATCH POINT 시스템 사이트맵 및 전체 대회 검색">
+                                      <style>
+                                        body {background: #f8fafc; font-family: 'Pretendard', sans-serif; margin: 0; padding: 0; color: #0f172a; min-height: 100vh; }
+                                        .header-bg {background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 60px 20px 80px; color: #fff; text-align: center; position: relative; overflow: hidden; }
+                                        .header-bg::after {content:''; position:absolute; bottom:-50px; left:-10%; width:120%; height:100px; background:#f8fafc; transform:rotate(-2deg); }
+                                        .container {max - width: 900px; margin: -50px auto 60px; padding: 0 20px; position: relative; z-index: 10; }
+                                        .card {background: rgba(255,255,255,0.85); backdrop-filter: blur(20px); border-radius: 32px; padding: 50px; box-shadow: 0 20px 50px rgba(0,0,0,0.05); border: 1px solid rgba(255,255,255,1); }
+                                        .section-title {font - size: 1.5rem; font-weight: 800; color: #0f172a; margin-bottom: 24px; display: flex; align-items: center; gap: 10px; }
+                                        .nav-grid {display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 50px; }
+                                        .nav-grid a {background: #fff; padding: 24px; border-radius: 20px; text-decoration: none; color: #334155; font-weight: 800; font-size: 1.1rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; transition: all 0.3s; border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
+                                        .nav-grid a:hover {transform: translateY(-5px); box-shadow: 0 15px 30px rgba(14, 165, 233, 0.1); border-color: #e0f2fe; color: #0ea5e9; }
+                                        .nav-grid a span {font - size: 2.5rem; transition: transform 0.3s; }
+                                        .nav-grid a:hover span {transform: scale(1.1); }
+                                      </style>
+                                  </head>
+                                  <body>
+                                    <div class="header-bg">
+                                      <span style="display:inline-block; padding:6px 14px; background:rgba(255,255,255,0.1); border-radius:20px; font-weight:700; font-size:0.85rem; margin-bottom:16px;">사이트맵 / 디렉토리</span>
+                                      <h1 style="margin:0; font-size:3rem; font-weight:900; letter-spacing:-1px;">MATCH POINT 🗺️</h1>
+                                      <p style="color:#94a3b8; font-size:1.1rem; margin-top:16px; font-weight:500;">전체 시스템 메뉴 및 역대 대회 목록을 한눈에 살펴보세요</p>
+                                    </div>
+                                    <div class="container">
+                                      <div class="card">
+                                        <div class="section-title"><span style="font-size:1.8rem;">🧭</span> 빠른 글로벌 메뉴</div>
+                                        <div class="nav-grid">
+                                          <a href="/"><span>🏠</span> 메인 홈</a>
+                                          <a href="/court"><span>🏟️</span> 코트 점수판</a>
+                                          <a href="/dashboard"><span>📊</span> 라이브 대시보드</a>
+                                        </div>
 
-                                      <div class="section-title" style="margin-top:20px;"><span style="font-size:1.8rem;">📋</span> 전체 대회 디렉토리</div>
-                                      <div style="background:#f1f5f9; padding:2px; border-radius:20px; margin-bottom:20px; display:inline-flex;">
-                                        <!-- Placeholder for search/filter if needed -->
-                                        <span style="padding:10px 20px; font-size:0.9rem; font-weight:700; color:#64748b;">등록된 전체 대회 리스트 (최신순)</span>
-                                      </div>
+                                        <div class="section-title" style="margin-top:20px;"><span style="font-size:1.8rem;">📋</span> 전체 대회 디렉토리</div>
+                                        <div style="background:#f1f5f9; padding:2px; border-radius:20px; margin-bottom:20px; display:inline-flex;">
+                                          <!-- Placeholder for search/filter if needed -->
+                                          <span style="padding:10px 20px; font-size:0.9rem; font-weight:700; color:#64748b;">등록된 전체 대회 리스트 (최신순)</span>
+                                        </div>
 
-                                      ${trns.length > 0 ? trnListHtml : '<div style="padding:60px; text-align:center; color:#94a3b8; background:#f8fafc; border-radius:24px; font-weight:600; font-size:1.1rem; border:2px dashed #e2e8f0;">개설된 대회가 없습니다. 새로 개설해 보세요!</div>'}
+                                        ${trns.length > 0 ? trnListHtml : '<div style="padding:60px; text-align:center; color:#94a3b8; background:#f8fafc; border-radius:24px; font-weight:600; font-size:1.1rem; border:2px dashed #e2e8f0;">개설된 대회가 없습니다. 새로 개설해 보세요!</div>'}
 
-                                      <div style="text-align:center; margin-top:50px; padding-top:40px; border-top:1px solid #e2e8f0;">
-                                        <button onclick="history.back()" style="padding:14px 32px; background:#fff; color:#475569; border:1px solid #cbd5e1; border-radius:16px; font-weight:800; font-size:1rem; cursor:pointer; transition:all 0.2s; box-shadow:0 4px 6px rgba(0,0,0,0.02);" onmouseover="this.style.background='#f8fafc'; this.style.borderColor='#94a3b8'; this.style.color='#0f172a'" onmouseout="this.style.background='#fff'; this.style.borderColor='#cbd5e1'; this.style.color='#475569'">← 이전 화면으로 돌아가기</button>
+                                        <div style="text-align:center; margin-top:50px; padding-top:40px; border-top:1px solid #e2e8f0;">
+                                          <button onclick="history.back()" style="padding:14px 32px; background:#fff; color:#475569; border:1px solid #cbd5e1; border-radius:16px; font-weight:800; font-size:1rem; cursor:pointer; transition:all 0.2s; box-shadow:0 4px 6px rgba(0,0,0,0.02);" onmouseover="this.style.background='#f8fafc'; this.style.borderColor='#94a3b8'; this.style.color='#0f172a'" onmouseout="this.style.background='#fff'; this.style.borderColor='#cbd5e1'; this.style.color='#475569'">← 이전 화면으로 돌아가기</button>
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
-                                </body>
-                              </html>`)
+                                  </body>
+                                </html>`)
   } catch (error) {
     return c.text('Error generating sitemap page', 500)
   }
@@ -746,10 +791,10 @@ app.get('/sitemap', async (c) => {
 app.get('/robots.txt', (c) => {
   c.header('Content-Type', 'text/plain')
   return c.body(`User-agent: *
-                              Allow: /
-                              Allow: /r/
-                              Disallow: /api/
-                              Sitemap: https://minton-tennis.pages.dev/sitemap.xml`)
+                                Allow: /
+                                Allow: /r/
+                                Disallow: /api/
+                                Sitemap: https://minton-tennis.pages.dev/sitemap.xml`)
 })
 
 // Court scoreboard
@@ -792,182 +837,182 @@ app.get('/watch', (c) => {
   const tid = params.get('tid') || '1'
   const court = params.get('court') || '1'
   return c.html(`<!DOCTYPE html>
-                              <html lang="ko">
-                                <head>
-                                  <meta charset="utf-8">
-                                    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-                                      <title>⌚ 코트 ${court} 점수판</title>
-                                      <meta name="apple-mobile-web-app-capable" content="yes">
-                                        <meta name="theme-color" content="#0f172a">
-                                          <style>
-                                            * {box - sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-                                            body {background: #0f172a; color: #f8fafc; font-family: -apple-system, 'Pretendard', sans-serif;
-                                            min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+                                <html lang="ko">
+                                  <head>
+                                    <meta charset="utf-8">
+                                      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+                                        <title>⌚ 코트 ${court} 점수판</title>
+                                        <meta name="apple-mobile-web-app-capable" content="yes">
+                                          <meta name="theme-color" content="#0f172a">
+                                            <style>
+                                              * {box - sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+                                              body {background: #0f172a; color: #f8fafc; font-family: -apple-system, 'Pretendard', sans-serif;
+                                              min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center;
            padding: 12px; user-select: none; }
-                                            #court-badge {font - size: 0.7rem; letter-spacing: 3px; text-transform: uppercase; color: #64748b; margin-bottom: 8px; }
-                                            #status-dot {width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block; margin-right: 4px; animation: pulse 1.5s infinite; }
-                                            @keyframes pulse {0 %, 100 % { opacity: 1 } 50%{opacity:0.3} }
-                                            #match-info {font - size: 0.65rem; color: #64748b; text-align: center; margin-bottom: 14px; min-height: 16px; }
-                                            .team-block {width: 100%; max-width: 320px; background: #1e293b; border-radius: 20px; padding: 16px 20px;
+                                              #court-badge {font - size: 0.7rem; letter-spacing: 3px; text-transform: uppercase; color: #64748b; margin-bottom: 8px; }
+                                              #status-dot {width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block; margin-right: 4px; animation: pulse 1.5s infinite; }
+                                              @keyframes pulse {0 %, 100 % { opacity: 1 } 50%{opacity:0.3} }
+                                              #match-info {font - size: 0.65rem; color: #64748b; text-align: center; margin-bottom: 14px; min-height: 16px; }
+                                              .team-block {width: 100%; max-width: 320px; background: #1e293b; border-radius: 20px; padding: 16px 20px;
                   display: flex; align-items: center; justify-content: space-between; margin: 6px 0; gap: 8px; }
-                                            .team-block.t1 {border - left: 4px solid #3b82f6; }
-                                            .team-block.t2 {border - left: 4px solid #ef4444; }
-                                            .team-name {font - size: 0.85rem; font-weight: 700; color: #cbd5e1; flex: 1;
+                                              .team-block.t1 {border - left: 4px solid #3b82f6; }
+                                              .team-block.t2 {border - left: 4px solid #ef4444; }
+                                              .team-name {font - size: 0.85rem; font-weight: 700; color: #cbd5e1; flex: 1;
                  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
-                                            .score-display {font - size: 3.2rem; font-weight: 900; min-width: 64px; text-align: center; line-height: 1; }
-                                            .t1 .score-display {color: #60a5fa; }
-                                            .t2 .score-display {color: #f87171; }
-                                            .btn-group {display: flex; flex-direction: column; gap: 4px; }
-                                            .score-btn {width: 44px; height: 36px; border: none; border-radius: 10px; font-weight: 900;
+                                              .score-display {font - size: 3.2rem; font-weight: 900; min-width: 64px; text-align: center; line-height: 1; }
+                                              .t1 .score-display {color: #60a5fa; }
+                                              .t2 .score-display {color: #f87171; }
+                                              .btn-group {display: flex; flex-direction: column; gap: 4px; }
+                                              .score-btn {width: 44px; height: 36px; border: none; border-radius: 10px; font-weight: 900;
                  font-size: 1.1rem; cursor: pointer; transition: transform 0.1s, opacity 0.1s; }
-                                            .score-btn:active {transform: scale(0.92); opacity: 0.8; }
-                                            .btn-plus  {background: #22c55e; color: #fff; }
-                                            .btn-minus {background: #334155; color: #94a3b8; font-size: 0.9rem; }
-                                            #set-tabs {display: flex; gap: 6px; margin-bottom: 10px; }
-                                            .set-tab {padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: 700;
+                                              .score-btn:active {transform: scale(0.92); opacity: 0.8; }
+                                              .btn-plus  {background: #22c55e; color: #fff; }
+                                              .btn-minus {background: #334155; color: #94a3b8; font-size: 0.9rem; }
+                                              #set-tabs {display: flex; gap: 6px; margin-bottom: 10px; }
+                                              .set-tab {padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: 700;
                border: 1px solid #334155; background: transparent; color: #64748b; cursor: pointer; }
-                                            .set-tab.active {background: #f97316; border-color: #f97316; color: #fff; }
-                                            #msg {font - size: 0.72rem; color: #94a3b8; margin-top: 10px; min-height: 18px; text-align: center; }
-                                            #no-match {text - align: center; padding: 20px; color: #64748b; }
-                                            #no-match .icon {font - size: 3rem; margin-bottom: 8px; }
-                                            #complete-btn {margin - top: 14px; width: 100%; max-width: 320px; padding: 14px; background: #7c3aed;
-                                            color: #fff; border: none; border-radius: 16px; font-weight: 700; font-size: 0.95rem;
+                                              .set-tab.active {background: #f97316; border-color: #f97316; color: #fff; }
+                                              #msg {font - size: 0.72rem; color: #94a3b8; margin-top: 10px; min-height: 18px; text-align: center; }
+                                              #no-match {text - align: center; padding: 20px; color: #64748b; }
+                                              #no-match .icon {font - size: 3rem; margin-bottom: 8px; }
+                                              #complete-btn {margin - top: 14px; width: 100%; max-width: 320px; padding: 14px; background: #7c3aed;
+                                              color: #fff; border: none; border-radius: 16px; font-weight: 700; font-size: 0.95rem;
                     cursor: pointer; }
-                                          </style>
-                                        </head>
-                                        <body>
-                                          <div style="position:absolute;top:12px;right:12px;">
-                                            <button onclick="if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen();" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#94a3b8;border-radius:6px;padding:4px 8px;font-size:0.75rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;"><span style="font-size:0.9rem;">⛶</span></button>
-                                          </div>
-                                          <div id="court-badge">⌚ COURT <span id="courtNum">${court}</span></div>
-                                          <div id="match-info">불러오는 중...</div>
+                                            </style>
+                                          </head>
+                                          <body>
+                                            <div style="position:absolute;top:12px;right:12px;">
+                                              <button onclick="if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen();" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#94a3b8;border-radius:6px;padding:4px 8px;font-size:0.75rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;"><span style="font-size:0.9rem;">⛶</span></button>
+                                            </div>
+                                            <div id="court-badge">⌚ COURT <span id="courtNum">${court}</span></div>
+                                            <div id="match-info">불러오는 중...</div>
 
-                                          <div id="set-tabs">
-                                            <button class="set-tab active" onclick="setActiveSet(1)">1게임</button>
-                                            <button class="set-tab" onclick="setActiveSet(2)">2게임</button>
-                                            <button class="set-tab" onclick="setActiveSet(3)">3게임</button>
-                                          </div>
+                                            <div id="set-tabs">
+                                              <button class="set-tab active" onclick="setActiveSet(1)">1게임</button>
+                                              <button class="set-tab" onclick="setActiveSet(2)">2게임</button>
+                                              <button class="set-tab" onclick="setActiveSet(3)">3게임</button>
+                                            </div>
 
-                                          <div id="score-ui">
-                                            <div class="team-block t1">
-                                              <div class="team-name" id="t1name">—</div>
-                                              <div class="score-display" id="t1score">0</div>
-                                              <div class="btn-group">
-                                                <button class="score-btn btn-plus" onclick="updateScore(1,'+1')">+1</button>
-                                                <button class="score-btn btn-minus" onclick="updateScore(1,'-1')">−1</button>
+                                            <div id="score-ui">
+                                              <div class="team-block t1">
+                                                <div class="team-name" id="t1name">—</div>
+                                                <div class="score-display" id="t1score">0</div>
+                                                <div class="btn-group">
+                                                  <button class="score-btn btn-plus" onclick="updateScore(1,'+1')">+1</button>
+                                                  <button class="score-btn btn-minus" onclick="updateScore(1,'-1')">−1</button>
+                                                </div>
+                                              </div>
+                                              <div style="text-align:center;color:#475569;font-size:0.75rem;margin:4px 0"><span id="status-dot"></span>LIVE</div>
+                                              <div class="team-block t2">
+                                                <div class="team-name" id="t2name">—</div>
+                                                <div class="score-display" id="t2score">0</div>
+                                                <div class="btn-group">
+                                                  <button class="score-btn btn-plus" onclick="updateScore(2,'+1')">+1</button>
+                                                  <button class="score-btn btn-minus" onclick="updateScore(2,'-1')">−1</button>
+                                                </div>
                                               </div>
                                             </div>
-                                            <div style="text-align:center;color:#475569;font-size:0.75rem;margin:4px 0"><span id="status-dot"></span>LIVE</div>
-                                            <div class="team-block t2">
-                                              <div class="team-name" id="t2name">—</div>
-                                              <div class="score-display" id="t2score">0</div>
-                                              <div class="btn-group">
-                                                <button class="score-btn btn-plus" onclick="updateScore(2,'+1')">+1</button>
-                                                <button class="score-btn btn-minus" onclick="updateScore(2,'-1')">−1</button>
-                                              </div>
+
+                                            <div id="no-match" style="display:none">
+                                              <div class="icon">⏸️</div>
+                                              <div>현재 진행 중인 경기가 없습니다</div>
+                                              <div style="font-size:0.72rem;margin-top:6px;color:#475569">경기가 시작되면 자동으로 표시됩니다</div>
                                             </div>
-                                          </div>
 
-                                          <div id="no-match" style="display:none">
-                                            <div class="icon">⏸️</div>
-                                            <div>현재 진행 중인 경기가 없습니다</div>
-                                            <div style="font-size:0.72rem;margin-top:6px;color:#475569">경기가 시작되면 자동으로 표시됩니다</div>
-                                          </div>
+                                            <button id="complete-btn" onclick="completeMatch()" style="display:none">✅ 경기 종료</button>
+                                            <div id="msg"></div>
 
-                                          <button id="complete-btn" onclick="completeMatch()" style="display:none">✅ 경기 종료</button>
-                                          <div id="msg"></div>
+                                            <script>
+                                              const tid = '${tid}';
+                                              const courtNum = '${court}';
+                                              let matchId = null;
+                                              let activeSet = 1;
+                                              let pollTimer;
 
-                                          <script>
-                                            const tid = '${tid}';
-                                            const courtNum = '${court}';
-                                            let matchId = null;
-                                            let activeSet = 1;
-                                            let pollTimer;
-
-                                            function setActiveSet(n) {
-                                              activeSet = n;
+                                              function setActiveSet(n) {
+                                                activeSet = n;
       document.querySelectorAll('.set-tab').forEach((el,i) => el.classList.toggle('active', i+1===n));
       fetch('/api/watch/' + tid + '/court/' + courtNum + '?set=' + n).then(r=>r.json()).then(updateUI).catch(()=>{ });
     }
 
-                                            function updateUI(data) {
+                                              function updateUI(data) {
       if (data.error) {
-                                              document.getElementById('score-ui').style.display = 'none';
-                                            document.getElementById('no-match').style.display = 'block';
-                                            document.getElementById('complete-btn').style.display = 'none';
-                                            document.getElementById('match-info').textContent = '';
-                                            matchId = null;
-                                            return;
+                                                document.getElementById('score-ui').style.display = 'none';
+                                              document.getElementById('no-match').style.display = 'block';
+                                              document.getElementById('complete-btn').style.display = 'none';
+                                              document.getElementById('match-info').textContent = '';
+                                              matchId = null;
+                                              return;
       }
-                                            matchId = data.match_id;
-                                            document.getElementById('score-ui').style.display = 'block';
-                                            document.getElementById('no-match').style.display = 'none';
-                                            document.getElementById('complete-btn').style.display = 'block';
-                                            document.getElementById('t1name').textContent = (data.t1?.name || '팀 1').substring(0, 12);
-                                            document.getElementById('t2name').textContent = (data.t2?.name || '팀 2').substring(0, 12);
-                                            document.getElementById('t1score').textContent = data.t1?.score ?? 0;
-                                            document.getElementById('t2score').textContent = data.t2?.score ?? 0;
-                                            const sport = data.sport_type || 'badminton';
-                                            const isBad = sport === 'badminton';
-                                            document.getElementById('match-info').textContent =
-                                            (isBad ? '🏸 배드민턴' : '🎾 테니스') + ' | ' + data.current_set + '게임 진행중 | R' + (data.round||'') + '-' + (data.match_order||'');
+                                              matchId = data.match_id;
+                                              document.getElementById('score-ui').style.display = 'block';
+                                              document.getElementById('no-match').style.display = 'none';
+                                              document.getElementById('complete-btn').style.display = 'block';
+                                              document.getElementById('t1name').textContent = (data.t1?.name || '팀 1').substring(0, 12);
+                                              document.getElementById('t2name').textContent = (data.t2?.name || '팀 2').substring(0, 12);
+                                              document.getElementById('t1score').textContent = data.t1?.score ?? 0;
+                                              document.getElementById('t2score').textContent = data.t2?.score ?? 0;
+                                              const sport = data.sport_type || 'badminton';
+                                              const isBad = sport === 'badminton';
+                                              document.getElementById('match-info').textContent =
+                                              (isBad ? '🏸 배드민턴' : '🎾 테니스') + ' | ' + data.current_set + '게임 진행중 | R' + (data.round||'') + '-' + (data.match_order||'');
       // Update tab labels
       document.querySelectorAll('.set-tab').forEach((el,i) =>
-                                            el.textContent = isBad ? (i+1)+'게임' : (i+1)+'세트');
+                                              el.textContent = isBad ? (i+1)+'게임' : (i+1)+'세트');
     }
 
-                                            async function updateScore(team, action) {
+                                              async function updateScore(team, action) {
       if (!matchId) {setMsg('진행중인 경기 없음'); return; }
-                                            try {
+                                              try {
         const r = await fetch('/api/watch/' + tid + '/match/' + matchId + '/score', {
-                                              method: 'POST',
-                                            headers: {'Content-Type':'application/json'},
-                                            body: JSON.stringify({team, action, set: activeSet })
+                                                method: 'POST',
+                                              headers: {'Content-Type':'application/json'},
+                                              body: JSON.stringify({team, action, set: activeSet })
         });
-                                            const d = await r.json();
-                                            if (d.success) {
+                                              const d = await r.json();
+                                              if (d.success) {
           const el = document.getElementById('t' + team + 'score');
-                                            el.textContent = d.new_score;
-                                            el.style.transform = 'scale(1.3)';
+                                              el.textContent = d.new_score;
+                                              el.style.transform = 'scale(1.3)';
           setTimeout(() => el.style.transform = '', 150);
-                                            setMsg(action === '+1' ? '✅ +1 점' : '↩ 취소');
+                                              setMsg(action === '+1' ? '✅ +1 점' : '↩ 취소');
         } else {setMsg('오류: ' + (d.error || '알수없음')); }
       } catch(e) {setMsg('네트워크 오류'); }
     }
 
-                                            async function completeMatch() {
+                                              async function completeMatch() {
       if (!matchId || !confirm('경기를 종료하시겠습니까?')) return;
-                                            try {
-                                              await fetch('/api/watch/' + tid + '/match/' + matchId + '/status', {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({ status: 'completed' })
-                                              });
-                                            setMsg('✅ 경기 종료 처리됨');
-                                            matchId = null;
-                                            setTimeout(poll, 2000);
+                                              try {
+                                                await fetch('/api/watch/' + tid + '/match/' + matchId + '/status', {
+                                                  method: 'POST',
+                                                  headers: { 'Content-Type': 'application/json' },
+                                                  body: JSON.stringify({ status: 'completed' })
+                                                });
+                                              setMsg('✅ 경기 종료 처리됨');
+                                              matchId = null;
+                                              setTimeout(poll, 2000);
       } catch(e) {setMsg('오류 발생'); }
     }
 
-                                            function setMsg(m) {
+                                              function setMsg(m) {
       const el = document.getElementById('msg');
-                                            el.textContent = m;
+                                              el.textContent = m;
       setTimeout(() => { if (el.textContent === m) el.textContent = ''; }, 2500);
     }
 
-                                            async function poll() {
+                                              async function poll() {
       try {
         const r = await fetch('/api/watch/' + tid + '/court/' + courtNum + '?set=' + activeSet);
-                                            const d = await r.json();
-                                            updateUI(d);
+                                              const d = await r.json();
+                                              updateUI(d);
       } catch(e) { /* network error, keep trying */}
     }
 
-                                            poll();
-                                            pollTimer = setInterval(poll, 3000);
-                                          </script>
-                                        </body>
-                                      </html>`)
+                                              poll();
+                                              pollTimer = setInterval(poll, 3000);
+                                            </script>
+                                          </body>
+                                        </html>`)
 })
 
 // ── 참가자 셀프 등록 페이지 (SSR) ──────────────────────────
@@ -1000,356 +1045,356 @@ app.get('/join/:id', async (c) => {
     : `<option value="">선택</option><option value="S">S (전/현직 선수)</option><option value="A">A (상급)</option><option value="B">B (중상급)</option><option value="C">C (중급)</option><option value="D">D (초중급)</option><option value="E">E (초급)</option>`
 
   return c.html(`<!DOCTYPE html>
-                                      <html lang="ko">
-                                        <head>
-                                          <meta charset="UTF-8">
-                                            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                                              ${commonHead}
-                                              <title>${title}</title>
-                                              <meta name="description" content="${desc}">
-                                                <meta property="og:type" content="website">
-                                                  <meta property="og:url" content="${base}/join/${id}">
-                                                    <meta property="og:title" content="${title}">
-                                                      <meta property="og:description" content="${desc}">
-                                                        <meta property="og:image" content="${base}/static/og-image.png">
-                                                          <meta property="og:locale" content="ko_KR">
-                                                            <style>
-                                                              * {margin:0; padding:0; box-sizing:border-box; }
-                                                              body {
-                                                                font - family: 'Pretendard','Inter',system-ui,sans-serif;
-                                                              background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-                                                              min-height: 100vh; color: #e2e8f0;
-                                                              display: flex; justify-content: center; align-items: flex-start;
-                                                              padding: 20px;
+                                        <html lang="ko">
+                                          <head>
+                                            <meta charset="UTF-8">
+                                              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                                                ${commonHead}
+                                                <title>${title}</title>
+                                                <meta name="description" content="${desc}">
+                                                  <meta property="og:type" content="website">
+                                                    <meta property="og:url" content="${base}/join/${id}">
+                                                      <meta property="og:title" content="${title}">
+                                                        <meta property="og:description" content="${desc}">
+                                                          <meta property="og:image" content="${base}/static/og-image.png">
+                                                            <meta property="og:locale" content="ko_KR">
+                                                              <style>
+                                                                * {margin:0; padding:0; box-sizing:border-box; }
+                                                                body {
+                                                                  font - family: 'Pretendard','Inter',system-ui,sans-serif;
+                                                                background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+                                                                min-height: 100vh; color: #e2e8f0;
+                                                                display: flex; justify-content: center; align-items: flex-start;
+                                                                padding: 20px;
     }
-                                                              .container {
-                                                                max - width: 480px; width: 100%; margin: 20px auto;
+                                                                .container {
+                                                                  max - width: 480px; width: 100%; margin: 20px auto;
     }
-                                                              .card {
-                                                                background: rgba(255,255,255,0.05);
-                                                              backdrop-filter: blur(20px);
-                                                              border: 1px solid rgba(255,255,255,0.1);
-                                                              border-radius: 24px; padding: 32px; margin-bottom: 20px;
+                                                                .card {
+                                                                  background: rgba(255,255,255,0.05);
+                                                                backdrop-filter: blur(20px);
+                                                                border: 1px solid rgba(255,255,255,0.1);
+                                                                border-radius: 24px; padding: 32px; margin-bottom: 20px;
     }
-                                                              .header {text - align: center; margin-bottom: 24px; }
-                                                              .header .sport {font - size: 2.5rem; margin-bottom: 8px; }
-                                                              .header h1 {
-                                                                font - size: 1.4rem; font-weight: 800; color: #fff;
-                                                              margin-bottom: 4px; word-break: keep-all;
+                                                                .header {text - align: center; margin-bottom: 24px; }
+                                                                .header .sport {font - size: 2.5rem; margin-bottom: 8px; }
+                                                                .header h1 {
+                                                                  font - size: 1.4rem; font-weight: 800; color: #fff;
+                                                                margin-bottom: 4px; word-break: keep-all;
     }
-                                                              .header .desc {font - size: 0.85rem; color: #94a3b8; }
-                                                              .header .count {
-                                                                display: inline-block; margin-top: 12px;
-                                                              padding: 6px 16px; border-radius: 20px;
-                                                              background: rgba(249,115,22,0.15); color: #fb923c;
-                                                              font-size: 0.85rem; font-weight: 600;
-    }
-
-                                                              .form-group {margin - bottom: 16px; }
-                                                              .form-group label {
-                                                                display: block; font-size: 0.8rem; font-weight: 600;
-                                                              color: #94a3b8; margin-bottom: 6px; letter-spacing: 0.5px;
-    }
-                                                              .form-group label .req {color: #f87171; }
-                                                              .form-control {
-                                                                width: 100%; padding: 12px 16px; border-radius: 12px;
-                                                              border: 1px solid rgba(255,255,255,0.15);
-                                                              background: rgba(255,255,255,0.07); color: #fff;
-                                                              font-size: 0.95rem; font-family: inherit;
-                                                              transition: all 0.2s;
-    }
-                                                              .form-control:focus {
-                                                                outline: none; border-color: ${themeColor};
-                                                              box-shadow: 0 0 0 3px ${themeColor}33;
-    }
-                                                              .form-control::placeholder {color: #475569; }
-                                                              select.form-control {cursor: pointer; }
-                                                              select.form-control option {background: #1e293b; color: #e2e8f0; }
-
-                                                              .form-row {display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
-                                                              .btn-submit {
-                                                                width: 100%; padding: 14px; border: none; border-radius: 14px;
-                                                              background: linear-gradient(135deg, #f97316, #8b5cf6);
-                                                              color: #fff; font-size: 1rem; font-weight: 700;
-                                                              cursor: pointer; font-family: inherit;
-                                                              transition: all 0.3s; margin-top: 8px;
-    }
-                                                              .btn-submit:hover {transform: translateY(-2px); box-shadow: 0 8px 25px rgba(249,115,22,0.4); }
-                                                              .btn-submit:active {transform: translateY(0); }
-                                                              .btn-submit:disabled {
-                                                                opacity: 0.5; cursor: not-allowed; transform: none !important;
-                                                              box-shadow: none !important;
+                                                                .header .desc {font - size: 0.85rem; color: #94a3b8; }
+                                                                .header .count {
+                                                                  display: inline-block; margin-top: 12px;
+                                                                padding: 6px 16px; border-radius: 20px;
+                                                                background: rgba(249,115,22,0.15); color: #fb923c;
+                                                                font-size: 0.85rem; font-weight: 600;
     }
 
-                                                              .success-card {
-                                                                display: none; text-align: center; padding: 40px 32px;
+                                                                .form-group {margin - bottom: 16px; }
+                                                                .form-group label {
+                                                                  display: block; font-size: 0.8rem; font-weight: 600;
+                                                                color: #94a3b8; margin-bottom: 6px; letter-spacing: 0.5px;
     }
-                                                              .success-card .icon {font - size: 4rem; margin-bottom: 16px; }
-                                                              .success-card h2 {font - size: 1.3rem; font-weight: 800; color: #fff; margin-bottom: 8px; }
-                                                              .success-card p {color: #94a3b8; font-size: 0.9rem; line-height: 1.6; }
-                                                              .success-card .home-link {
-                                                                display: inline-block; margin-top: 20px;
-                                                              padding: 10px 24px; border-radius: 12px;
-                                                              background: rgba(255,255,255,0.1); color: #fff;
-                                                              text-decoration: none; font-weight: 600; font-size: 0.9rem;
+                                                                .form-group label .req {color: #f87171; }
+                                                                .form-control {
+                                                                  width: 100%; padding: 12px 16px; border-radius: 12px;
+                                                                border: 1px solid rgba(255,255,255,0.15);
+                                                                background: rgba(255,255,255,0.07); color: #fff;
+                                                                font-size: 0.95rem; font-family: inherit;
+                                                                transition: all 0.2s;
+    }
+                                                                .form-control:focus {
+                                                                  outline: none; border-color: ${themeColor};
+                                                                box-shadow: 0 0 0 3px ${themeColor}33;
+    }
+                                                                .form-control::placeholder {color: #475569; }
+                                                                select.form-control {cursor: pointer; }
+                                                                select.form-control option {background: #1e293b; color: #e2e8f0; }
+
+                                                                .form-row {display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+                                                                .btn-submit {
+                                                                  width: 100%; padding: 14px; border: none; border-radius: 14px;
+                                                                background: linear-gradient(135deg, #f97316, #8b5cf6);
+                                                                color: #fff; font-size: 1rem; font-weight: 700;
+                                                                cursor: pointer; font-family: inherit;
+                                                                transition: all 0.3s; margin-top: 8px;
+    }
+                                                                .btn-submit:hover {transform: translateY(-2px); box-shadow: 0 8px 25px rgba(249,115,22,0.4); }
+                                                                .btn-submit:active {transform: translateY(0); }
+                                                                .btn-submit:disabled {
+                                                                  opacity: 0.5; cursor: not-allowed; transform: none !important;
+                                                                box-shadow: none !important;
     }
 
-                                                              .footer {text - align: center; color: #475569; font-size: 0.75rem; margin-top: 16px; }
-                                                              .footer a {color: #64748b; text-decoration: none; }
-
-                                                              .toast {
-                                                                position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-                                                              padding: 12px 24px; border-radius: 12px;
-                                                              background: #dc2626; color: #fff; font-size: 0.85rem; font-weight: 600;
-                                                              display: none; z-index: 999; box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+                                                                .success-card {
+                                                                  display: none; text-align: center; padding: 40px 32px;
     }
-                                                              .toast.show {display: block; animation: fadeIn 0.3s; }
-                                                              @keyframes fadeIn {from {opacity:0; transform:translateX(-50%) translateY(-10px); } to {opacity:1; transform:translateX(-50%) translateY(0); } }
-                                                            </style>
-                                                          </head>
-                                                          <body>
-                                                            <div class="container">
-                                                              <!-- 신청 폼 -->
-                                                              <div class="card" id="formCard">
-                                                                <div class="header">
-                                                                  <div class="sport">${sportType === 'tennis' ? '🎾' : '🏸'}</div>
-                                                                  <h1>${t.name}</h1>
-                                                                  <p class="desc">${t.description || '참가 신청 페이지'}</p>
-                                                                  <div class="count">현재 ${currentCount}명 신청 완료</div>
-                                                                </div>
+                                                                .success-card .icon {font - size: 4rem; margin-bottom: 16px; }
+                                                                .success-card h2 {font - size: 1.3rem; font-weight: 800; color: #fff; margin-bottom: 8px; }
+                                                                .success-card p {color: #94a3b8; font-size: 0.9rem; line-height: 1.6; }
+                                                                .success-card .home-link {
+                                                                  display: inline-block; margin-top: 20px;
+                                                                padding: 10px 24px; border-radius: 12px;
+                                                                background: rgba(255,255,255,0.1); color: #fff;
+                                                                text-decoration: none; font-weight: 600; font-size: 0.9rem;
+    }
 
-                                                                <form id="joinForm" onsubmit="submitForm(event)">
-                                                                  <div class="form-group">
-                                                                    <label>이름 <span class="req">*</span></label>
-                                                                    <input class="form-control" id="jName" placeholder="홍길동" required>
+                                                                .footer {text - align: center; color: #475569; font-size: 0.75rem; margin-top: 16px; }
+                                                                .footer a {color: #64748b; text-decoration: none; }
+
+                                                                .toast {
+                                                                  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+                                                                padding: 12px 24px; border-radius: 12px;
+                                                                background: #dc2626; color: #fff; font-size: 0.85rem; font-weight: 600;
+                                                                display: none; z-index: 999; box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    }
+                                                                .toast.show {display: block; animation: fadeIn 0.3s; }
+                                                                @keyframes fadeIn {from {opacity:0; transform:translateX(-50%) translateY(-10px); } to {opacity:1; transform:translateX(-50%) translateY(0); } }
+                                                              </style>
+                                                            </head>
+                                                            <body>
+                                                              <div class="container">
+                                                                <!-- 신청 폼 -->
+                                                                <div class="card" id="formCard">
+                                                                  <div class="header">
+                                                                    <div class="sport">${sportType === 'tennis' ? '🎾' : '🏸'}</div>
+                                                                    <h1>${t.name}</h1>
+                                                                    <p class="desc">${t.description || '참가 신청 페이지'}</p>
+                                                                    <div class="count">현재 ${currentCount}명 신청 완료</div>
                                                                   </div>
 
-                                                                  <div class="form-group">
-                                                                    <label>전화번호 <span class="req">*</span></label>
-                                                                    <input class="form-control" id="jPhone" placeholder="010-1234-5678" type="tel">
-                                                                  </div>
-
-                                                                  <div class="form-row">
+                                                                  <form id="joinForm" onsubmit="submitForm(event)">
                                                                     <div class="form-group">
-                                                                      <label>성별 <span class="req">*</span></label>
-                                                                      <select class="form-control" id="jGender" required>
-                                                                        <option value="">선택</option>
-                                                                        <option value="m">남성</option>
-                                                                        <option value="f">여성</option>
-                                                                      </select>
+                                                                      <label>이름 <span class="req">*</span></label>
+                                                                      <input class="form-control" id="jName" placeholder="홍길동" required>
                                                                     </div>
+
                                                                     <div class="form-group">
-                                                                      <label>출생연도 <span class="req">*</span></label>
-                                                                      <input class="form-control" id="jBirth" type="number" placeholder="1990" min="1940" max="2015" required>
+                                                                      <label>전화번호 <span class="req">*</span></label>
+                                                                      <input class="form-control" id="jPhone" placeholder="010-1234-5678" type="tel">
                                                                     </div>
+
+                                                                    <div class="form-row">
+                                                                      <div class="form-group">
+                                                                        <label>성별 <span class="req">*</span></label>
+                                                                        <select class="form-control" id="jGender" required>
+                                                                          <option value="">선택</option>
+                                                                          <option value="m">남성</option>
+                                                                          <option value="f">여성</option>
+                                                                        </select>
+                                                                      </div>
+                                                                      <div class="form-group">
+                                                                        <label>출생연도 <span class="req">*</span></label>
+                                                                        <input class="form-control" id="jBirth" type="number" placeholder="1990" min="1940" max="2015" required>
+                                                                      </div>
+                                                                    </div>
+
+                                                                    <div class="form-row">
+                                                                      <div class="form-group">
+                                                                        <label>레벨 <span class="req">*</span></label>
+                                                                        <select class="form-control" id="jLevel" required>
+                                                                          ${levelOptions}
+                                                                        </select>
+                                                                      </div>
+                                                                      <div class="form-group">
+                                                                        <label>소속 클럽</label>
+                                                                        <input class="form-control" id="jClub" placeholder="클럽명 (선택)">
+                                                                      </div>
+                                                                    </div>
+
+                                                                    <div class="form-group">
+                                                                      <label>복식 파트너 (있을 경우)</label>
+                                                                      <input class="form-control" id="jPartner" placeholder="파트너 이름 (선택)">
+                                                                    </div>
+                                                                  </form>
+
+                                                                  <div id="payment-widget-container" style="display:none; margin-top:20px; transition:all 0.3s; opacity:0; pointer-events:none;">
+                                                                    <h3 style="font-size:1rem; font-weight:700; color:#fff; margin-bottom:12px; border-top:1px dashed rgba(255,255,255,0.1); padding-top:20px; text-align:center;">💳 참가비 결제 (${(t.participation_fee || 0).toLocaleString()}원)</h3>
+                                                                    <div style="background:#fff; border-radius:12px; overflow:hidden;">
+                                                                      <div id="payment-method"></div>
+                                                                      <div id="agreement"></div>
+                                                                    </div>
+                                                                    <button type="button" class="btn-submit" id="btnPayment" style="background:#3182f6; display:none; margin-top:16px;">
+                                                                      결제하기
+                                                                    </button>
                                                                   </div>
 
-                                                                  <div class="form-row">
-                                                                    <div class="form-group">
-                                                                      <label>레벨 <span class="req">*</span></label>
-                                                                      <select class="form-control" id="jLevel" required>
-                                                                        ${levelOptions}
-                                                                      </select>
-                                                                    </div>
-                                                                    <div class="form-group">
-                                                                      <label>소속 클럽</label>
-                                                                      <input class="form-control" id="jClub" placeholder="클럽명 (선택)">
-                                                                    </div>
-                                                                  </div>
-
-                                                                  <div class="form-group">
-                                                                    <label>복식 파트너 (있을 경우)</label>
-                                                                    <input class="form-control" id="jPartner" placeholder="파트너 이름 (선택)">
-                                                                  </div>
-                                                                </form>
-
-                                                                <div id="payment-widget-container" style="display:none; margin-top:20px; transition:all 0.3s; opacity:0; pointer-events:none;">
-                                                                  <h3 style="font-size:1rem; font-weight:700; color:#fff; margin-bottom:12px; border-top:1px dashed rgba(255,255,255,0.1); padding-top:20px; text-align:center;">💳 참가비 결제 (${(t.participation_fee || 0).toLocaleString()}원)</h3>
-                                                                  <div style="background:#fff; border-radius:12px; overflow:hidden;">
-                                                                    <div id="payment-method"></div>
-                                                                    <div id="agreement"></div>
-                                                                  </div>
-                                                                  <button type="button" class="btn-submit" id="btnPayment" style="background:#3182f6; display:none; margin-top:16px;">
-                                                                    결제하기
+                                                                  <button type="submit" class="btn-submit" id="submitBtn">
+                                                                    ✅ 참가 신청하기
                                                                   </button>
                                                                 </div>
 
-                                                                <button type="submit" class="btn-submit" id="submitBtn">
-                                                                  ✅ 참가 신청하기
-                                                                </button>
+                                                                <!-- 성공 화면 -->
+                                                                <div class="card success-card" id="successCard">
+                                                                  <div class="icon">🎉</div>
+                                                                  <h2 id="successTitle">참가 신청 완료!</h2>
+                                                                  <p><strong>${t.name}</strong> 대회에<br>성공적으로 신청되었습니다.</p>
+                                                                  <p style="margin-top:12px; color:#64748b; font-size:0.8rem;">
+                                                                    대회 운영자가 확인 후 안내드립니다.
+                                                                  </p>
+                                                                  <a href="${base}" class="home-link">🏠 Match Point 홈으로</a>
+                                                                </div>
+
+                                                                <div class="footer">
+                                                                  <p>Powered by <a href="${base}">Match Point</a> — 스포츠 대회 운영 솔루션</p>
+                                                                </div>
                                                               </div>
 
-                                                              <!-- 성공 화면 -->
-                                                              <div class="card success-card" id="successCard">
-                                                                <div class="icon">🎉</div>
-                                                                <h2 id="successTitle">참가 신청 완료!</h2>
-                                                                <p><strong>${t.name}</strong> 대회에<br>성공적으로 신청되었습니다.</p>
-                                                                <p style="margin-top:12px; color:#64748b; font-size:0.8rem;">
-                                                                  대회 운영자가 확인 후 안내드립니다.
-                                                                </p>
-                                                                <a href="${base}" class="home-link">🏠 Match Point 홈으로</a>
-                                                              </div>
+                                                              <div class="toast" id="toast"></div>
 
-                                                              <div class="footer">
-                                                                <p>Powered by <a href="${base}">Match Point</a> — 스포츠 대회 운영 솔루션</p>
-                                                              </div>
-                                                            </div>
-
-                                                            <div class="toast" id="toast"></div>
-
-                                                            <script src="https://js.tosspayments.com/v1/payment-widget"></script>
-                                                            <script>
-                                                              const usePayment = ${t.use_payment ? 'true' : 'false'};
-                                                              const feeAmount = ${t.participation_fee || 0};
-                                                              const tournamentId = ${id};
-                                                              let paymentWidget = null;
-                                                              let paymentMethodWidget = null;
-                                                              let registeredParticipantId = null;
+                                                              <script src="https://js.tosspayments.com/v1/payment-widget"></script>
+                                                              <script>
+                                                                const usePayment = ${t.use_payment ? 'true' : 'false'};
+                                                                const feeAmount = ${t.participation_fee || 0};
+                                                                const tournamentId = ${id};
+                                                                let paymentWidget = null;
+                                                                let paymentMethodWidget = null;
+                                                                let registeredParticipantId = null;
 
     // URL 파라미터 확인 (결제 리다이렉트 처리)
     window.addEventListener('load', async () => {
       const urlParams = new URL(location.href).searchParams;
-                                                              if (urlParams.get('paymentKey') && urlParams.get('orderId') && urlParams.get('amount')) {
-                                                                // 결제 성공 리다이렉트로 돌아온 상태
-                                                                document.getElementById('formCard').style.display = 'none';
+                                                                if (urlParams.get('paymentKey') && urlParams.get('orderId') && urlParams.get('amount')) {
+                                                                  // 결제 성공 리다이렉트로 돌아온 상태
+                                                                  document.getElementById('formCard').style.display = 'none';
 
-                                                              try {
+                                                                try {
           const body = {
-                                                                paymentKey: urlParams.get('paymentKey'),
-                                                              orderId: urlParams.get('orderId'),
-                                                              amount: parseInt(urlParams.get('amount')),
-                                                              tournamentId: tournamentId,
-                                                              participantIds: urlParams.get('pid') ? [parseInt(urlParams.get('pid'))] : []
+                                                                  paymentKey: urlParams.get('paymentKey'),
+                                                                orderId: urlParams.get('orderId'),
+                                                                amount: parseInt(urlParams.get('amount')),
+                                                                tournamentId: tournamentId,
+                                                                participantIds: urlParams.get('pid') ? [parseInt(urlParams.get('pid'))] : []
           };
-                                                              const res = await fetch('/api/payments/confirm', {
-                                                                method: 'POST',
-                                                              headers: {'Content-Type': 'application/json' },
-                                                              body: JSON.stringify(body)
+                                                                const res = await fetch('/api/payments/confirm', {
+                                                                  method: 'POST',
+                                                                headers: {'Content-Type': 'application/json' },
+                                                                body: JSON.stringify(body)
           });
-                                                              const data = await res.json();
-                                                              if (data.success) {
-                                                                document.getElementById('successTitle').textContent = '✅ 결제 및 참가 완료!';
-                                                              document.getElementById('successCard').style.display = 'block';
+                                                                const data = await res.json();
+                                                                if (data.success) {
+                                                                  document.getElementById('successTitle').textContent = '✅ 결제 및 참가 완료!';
+                                                                document.getElementById('successCard').style.display = 'block';
           } else {
-                                                                alert('결제 승인에 실패했습니다: ' + (data.error || ''));
-                                                              window.location.href = window.location.pathname;
+                                                                  alert('결제 승인에 실패했습니다: ' + (data.error || ''));
+                                                                window.location.href = window.location.pathname;
           }
         } catch (e) {
-                                                                alert('서버 오류로 결제 승인을 실패했습니다.');
-                                                              window.location.href = window.location.pathname;
+                                                                  alert('서버 오류로 결제 승인을 실패했습니다.');
+                                                                window.location.href = window.location.pathname;
         }
       } else if (urlParams.get('fail')) {
-                                                                alert('결제를 취소했거나 실패했습니다.');
-                                                              window.history.replaceState({ }, document.title, window.location.pathname);
+                                                                  alert('결제를 취소했거나 실패했습니다.');
+                                                                window.history.replaceState({ }, document.title, window.location.pathname);
       }
     });
 
     if (usePayment && feeAmount > 0) {
       // 결제 사용인 경우 초기화
       const clientKey = 'test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm';
-                                                              const customerKey = 'USER_' + Date.now() + Math.floor(Math.random() * 1000);
-                                                              try {
-                                                                paymentWidget = PaymentWidget(clientKey, customerKey);
+                                                                const customerKey = 'USER_' + Date.now() + Math.floor(Math.random() * 1000);
+                                                                try {
+                                                                  paymentWidget = PaymentWidget(clientKey, customerKey);
       } catch (e) {console.error('토스 위젯 로드 에러', e); }
     }
 
-                                                              async function submitForm(e) {
-                                                                e.preventDefault();
-                                                              const btn = document.getElementById('submitBtn');
-                                                              btn.disabled = true;
-                                                              btn.textContent = '⏳ 신청 중...';
+                                                                async function submitForm(e) {
+                                                                  e.preventDefault();
+                                                                const btn = document.getElementById('submitBtn');
+                                                                btn.disabled = true;
+                                                                btn.textContent = '⏳ 신청 중...';
 
-                                                              const body = {
-                                                                name: document.getElementById('jName').value.trim(),
-                                                              phone: document.getElementById('jPhone').value.trim(),
-                                                              gender: document.getElementById('jGender').value,
-                                                              birth_year: parseInt(document.getElementById('jBirth').value),
-                                                              level: document.getElementById('jLevel').value,
-                                                              club: document.getElementById('jClub').value.trim(),
-                                                              partner: document.getElementById('jPartner').value.trim(),
+                                                                const body = {
+                                                                  name: document.getElementById('jName').value.trim(),
+                                                                phone: document.getElementById('jPhone').value.trim(),
+                                                                gender: document.getElementById('jGender').value,
+                                                                birth_year: parseInt(document.getElementById('jBirth').value),
+                                                                level: document.getElementById('jLevel').value,
+                                                                club: document.getElementById('jClub').value.trim(),
+                                                                partner: document.getElementById('jPartner').value.trim(),
       };
 
-                                                              if (!body.name || !body.gender || !body.birth_year || !body.level) {
-                                                                showToast('필수 항목을 모두 입력해주세요');
-                                                              btn.disabled = false;
-                                                              btn.textContent = '✅ 참가 신청하기';
-                                                              return;
+                                                                if (!body.name || !body.gender || !body.birth_year || !body.level) {
+                                                                  showToast('필수 항목을 모두 입력해주세요');
+                                                                btn.disabled = false;
+                                                                btn.textContent = '✅ 참가 신청하기';
+                                                                return;
       }
 
-                                                              try {
+                                                                try {
         const res = await fetch('/api/tournaments/' + tournamentId + '/participants', {
-                                                                method: 'POST',
-                                                              headers: {'Content-Type': 'application/json' },
-                                                              body: JSON.stringify(body)
+                                                                  method: 'POST',
+                                                                headers: {'Content-Type': 'application/json' },
+                                                                body: JSON.stringify(body)
         });
-                                                              const data = await res.json();
+                                                                const data = await res.json();
 
-                                                              if (data.success) {
-                                                                registeredParticipantId = data.id || data.participant?.id;
+                                                                if (data.success) {
+                                                                  registeredParticipantId = data.id || data.participant?.id;
           
           if (usePayment && feeAmount > 0 && paymentWidget) {
-                                                                // 결제창 띄우기 모드로 전환
-                                                                btn.style.display = 'none';
-                                                              document.getElementById('joinForm').style.pointerEvents = 'none';
-                                                              document.getElementById('joinForm').style.opacity = '0.5';
+                                                                  // 결제창 띄우기 모드로 전환
+                                                                  btn.style.display = 'none';
+                                                                document.getElementById('joinForm').style.pointerEvents = 'none';
+                                                                document.getElementById('joinForm').style.opacity = '0.5';
 
-                                                              const widgetContainer = document.getElementById('payment-widget-container');
-                                                              widgetContainer.style.display = 'block';
+                                                                const widgetContainer = document.getElementById('payment-widget-container');
+                                                                widgetContainer.style.display = 'block';
 
-                                                              // 토스페이먼츠 렌더링
-                                                              paymentMethodWidget = paymentWidget.renderPaymentMethods('#payment-method', {value: feeAmount });
-                                                              paymentWidget.renderAgreement('#agreement');
+                                                                // 토스페이먼츠 렌더링
+                                                                paymentMethodWidget = paymentWidget.renderPaymentMethods('#payment-method', {value: feeAmount });
+                                                                paymentWidget.renderAgreement('#agreement');
             
             setTimeout(() => {
-                                                                widgetContainer.style.opacity = '1';
-                                                              widgetContainer.style.pointerEvents = 'auto';
+                                                                  widgetContainer.style.opacity = '1';
+                                                                widgetContainer.style.pointerEvents = 'auto';
             }, 100);
 
-                                                              const btnPay = document.getElementById('btnPayment');
-                                                              btnPay.style.display = 'block';
+                                                                const btnPay = document.getElementById('btnPayment');
+                                                                btnPay.style.display = 'block';
             btnPay.onclick = async () => {
               try {
-                                                                await paymentWidget.requestPayment({
-                                                                  orderId: 'ORDER_' + Date.now(),
-                                                                  orderName: '대회 참가비 (' + body.name + ')',
-                                                                  successUrl: window.location.origin + '/join/' + tournamentId + '?pid=' + registeredParticipantId,
-                                                                  failUrl: window.location.origin + '/join/' + tournamentId + '?fail=true',
-                                                                  customerEmail: 'customer123@gmail.com',
-                                                                  customerName: body.name,
-                                                                });
+                                                                  await paymentWidget.requestPayment({
+                                                                    orderId: 'ORDER_' + Date.now(),
+                                                                    orderName: '대회 참가비 (' + body.name + ')',
+                                                                    successUrl: window.location.origin + '/join/' + tournamentId + '?pid=' + registeredParticipantId,
+                                                                    failUrl: window.location.origin + '/join/' + tournamentId + '?fail=true',
+                                                                    customerEmail: 'customer123@gmail.com',
+                                                                    customerName: body.name,
+                                                                  });
               } catch (err) {
-                                                                console.error(err);
-                                                              if (err.code !== 'USER_CANCEL') alert(err.message);
+                                                                  console.error(err);
+                                                                if (err.code !== 'USER_CANCEL') alert(err.message);
               }
             };
 
           } else {
-                                                                // 결제 비사용 대회 -> 바로 성공 화면
-                                                                document.getElementById('formCard').style.display = 'none';
-                                                              document.getElementById('successCard').style.display = 'block';
+                                                                  // 결제 비사용 대회 -> 바로 성공 화면
+                                                                  document.getElementById('formCard').style.display = 'none';
+                                                                document.getElementById('successCard').style.display = 'block';
           }
         } else {
-                                                                showToast(data.error || '신청에 실패했습니다');
-                                                              btn.disabled = false;
-                                                              btn.textContent = '✅ 참가 신청하기';
+                                                                  showToast(data.error || '신청에 실패했습니다');
+                                                                btn.disabled = false;
+                                                                btn.textContent = '✅ 참가 신청하기';
         }
       } catch (err) {
-                                                                showToast('네트워크 오류가 발생했습니다');
-                                                              btn.disabled = false;
-                                                              btn.textContent = '✅ 참가 신청하기';
+                                                                  showToast('네트워크 오류가 발생했습니다');
+                                                                btn.disabled = false;
+                                                                btn.textContent = '✅ 참가 신청하기';
       }
     }
 
-                                                              function showToast(msg) {
+                                                                function showToast(msg) {
       const t = document.getElementById('toast');
-                                                              t.textContent = msg;
-                                                              t.classList.add('show');
+                                                                t.textContent = msg;
+                                                                t.classList.add('show');
       setTimeout(() => t.classList.remove('show'), 3000);
     }
-                                                            </script>
-                                                          </body>
-                                                        </html>`)
+                                                              </script>
+                                                            </body>
+                                                          </html>`)
 })
 
 export default app

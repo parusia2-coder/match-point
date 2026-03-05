@@ -3,8 +3,8 @@
 //  전략: 정적 파일 캐시 우선 / API 네트워크 우선 + 폴백
 // =========================================================
 
-const CACHE_NAME = 'mp-v3.5';
-const API_CACHE = 'mp-api-v3.5';
+const CACHE_NAME = 'mp-v4.0-AI';
+const API_CACHE = 'mp-api-v4.0-AI';
 
 
 // 설치 시 즉시 캐시할 정적 리소스
