@@ -77,8 +77,8 @@ const commonHead = `
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-<link rel="stylesheet" href="/static/style.css?v=20260304c">
-<link rel="stylesheet" href="/static/theme-override.css?v=20260304c">
+<link rel="stylesheet" href="/static/style.css?v=20260307">
+<link rel="stylesheet" href="/static/theme-override.css?v=20260307">
 `
 const renderSWAndEnd = () => `
   <!-- Service Worker 등록 -->
@@ -222,13 +222,13 @@ app.get('/', (c) => {
   </script>
 
   <!-- Script Resources -->
-  <script src="/static/app.js?v=20260306_AI"></script>
-  <script src="/static/members.js?v=20260306_AI"></script>
-  <script src="/static/auth.js?v=20260306_AI"></script>
-  <script src="/static/ranking.js?v=20260306_AI"></script>
-  <script src="/static/report.js?v=20260306_AI"></script>
-  <script src="/static/ai_dashboard.js?v=20260306_AI"></script>
-  <script src="/static/broadcast.js?v=20260306_AI"></script>
+  <script src="/static/app.js?v=20260307"></script>
+  <script src="/static/members.js?v=20260307"></script>
+  <script src="/static/auth.js?v=20260307"></script>
+  <script src="/static/ranking.js?v=20260307"></script>
+  <script src="/static/report.js?v=20260307"></script>
+  <script src="/static/ai_dashboard.js?v=20260307"></script>
+  <script src="/static/broadcast.js?v=20260307"></script>
 ${renderSWAndEnd()}
 `)
 })
