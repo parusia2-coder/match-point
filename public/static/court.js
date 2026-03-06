@@ -310,6 +310,7 @@ function renderCourtCenter(app) {
         <button onclick="window.open('/board?tid=${tid}${vid ? '&vid=' + vid : ''}', '_blank')" style="padding:10px 20px;background:#252d3a;border:1px solid #3b82f6;border-radius:8px;color:#60a5fa;cursor:pointer;font-weight:700;display:flex;align-items:center;gap:8px;">📺 대형 전광판</button>
         <button onclick="showQRCodeModal()" style="padding:10px 20px;background:#312e81;border:1px solid #4f46e5;border-radius:8px;color:#c7d2fe;cursor:pointer;font-weight:700;display:flex;align-items:center;gap:8px;">📱 QR 코드 생성</button>
           <button onclick="enterJudgeMode()" style="padding:10px 20px;background:linear-gradient(135deg,#f97316,#ef4444);border:none;border-radius:8px;color:#fff;cursor:pointer;font-weight:700;display:flex;align-items:center;gap:8px;">👨‍⚖️ 심판 퀵모드</button>
+          <button onclick="showOverlayLinks()" style="padding:10px 20px;background:#065f46;border:1px solid #10b981;border-radius:8px;color:#34d399;cursor:pointer;font-weight:700;display:flex;align-items:center;gap:8px;">📡 OBS 오버레이</button>
         </div>
     </div>
 
@@ -1414,6 +1415,62 @@ window.enterJudgeMode = function () {
 
   html += `</div>
     <button onclick="document.getElementById('judgeModal').remove()" style="margin-top:24px;padding:12px 32px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:12px;color:#94a3b8;cursor:pointer;font-weight:700;font-size:1rem;">← 닫기</button>`;
+
+  modal.innerHTML = html;
+  document.body.appendChild(modal);
+};
+
+// =========================================================
+//  📡 OBS 스트리밍 오버레이 링크 모달
+// =========================================================
+window.showOverlayLinks = function () {
+  const courts = courtCenterData || [];
+  const modal = document.createElement('div');
+  modal.id = 'overlayModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.9);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;padding:20px;font-family:Pretendard,sans-serif;';
+
+  let html = `
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:3rem;margin-bottom:12px;">📡</div>
+      <h2 style="font-size:1.8rem;font-weight:900;color:#f8fafc;margin:0 0 8px;">OBS 스트리밍 오버레이</h2>
+      <p style="color:#94a3b8;font-size:0.9rem;margin:0 0 4px;">OBS Studio → 소스 추가 → "브라우저" → 아래 URL 입력</p>
+      <p style="color:#64748b;font-size:0.8rem;margin:0;">투명 배경 · 권장 크기: 1920×1080</p>
+    </div>
+    <div style="width:100%;max-width:700px;display:flex;flex-direction:column;gap:12px;max-height:60vh;overflow-y:auto;">`;
+
+  courts.forEach(c => {
+    const overlayUrl = location.origin + '/overlay?tid=' + tid + '&court=' + c.court;
+    const hasMatch = c.current;
+    const statusText = hasMatch ? `${c.current.team1_name || '?'} vs ${c.current.team2_name || '?'}` : '대기 중';
+    const statusColor = hasMatch ? '#10b981' : '#64748b';
+
+    html += `
+      <div style="padding:16px 20px;background:#1e293b;border:1px solid rgba(16,185,129,0.2);border-radius:14px;display:flex;align-items:center;gap:16px;">
+        <div style="width:48px;height:48px;background:linear-gradient(135deg,#065f46,#10b981);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:900;color:#fff;flex-shrink:0;">${c.court}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.95rem;font-weight:700;color:#f1f5f9;margin-bottom:4px;">${c.court}코트 오버레이</div>
+          <div style="font-size:0.75rem;color:${statusColor};font-weight:600;">${statusText}</div>
+          <div style="font-size:0.7rem;color:#475569;margin-top:4px;word-break:break-all;font-family:monospace;">${overlayUrl}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+          <button onclick="navigator.clipboard.writeText('${overlayUrl}').then(()=>alert('복사됨!'))" style="padding:6px 14px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);border-radius:8px;color:#34d399;cursor:pointer;font-weight:700;font-size:0.8rem;">📋 복사</button>
+          <button onclick="window.open('${overlayUrl}','_blank')" style="padding:6px 14px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);border-radius:8px;color:#60a5fa;cursor:pointer;font-weight:700;font-size:0.8rem;">↗ 미리보기</button>
+        </div>
+      </div>`;
+  });
+
+  html += `</div>
+    <div style="margin-top:20px;padding:14px 20px;background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.2);border-radius:12px;max-width:700px;width:100%;">
+      <div style="font-size:0.85rem;color:#f97316;font-weight:700;margin-bottom:6px;">💡 OBS 설정 가이드</div>
+      <div style="font-size:0.78rem;color:#94a3b8;line-height:1.6;">
+        1. OBS → 소스 → + → <b>브라우저</b> 선택<br>
+        2. URL에 위 링크 붙여넣기<br>
+        3. 너비: <b>1920</b>, 높이: <b>1080</b> 설정<br>
+        4. ✅ "사용자 정의 CSS 없음" 체크<br>
+        5. 투명 배경이 자동 적용됩니다
+      </div>
+    </div>
+    <button onclick="document.getElementById('overlayModal').remove()" style="margin-top:16px;padding:12px 32px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:12px;color:#94a3b8;cursor:pointer;font-weight:700;font-size:1rem;">← 닫기</button>`;
 
   modal.innerHTML = html;
   document.body.appendChild(modal);

@@ -832,6 +832,305 @@ app.get('/print', (c) => {
   return c.html(printHtml.replace(/\$\{commonHead\}/g, commonHead))
 })
 
+// 📡 OBS Streaming Overlay (투명 배경 오버레이)
+app.get('/overlay', (c) => {
+  return c.html(`<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📡 Match Point — Streaming Overlay</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: transparent;
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* === 하단 스코어 바 === */
+    .score-bar {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: stretch;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+      min-width: 700px;
+      max-width: 900px;
+      opacity: 0;
+      animation: slideUp 0.6s cubic-bezier(0.22,1,0.36,1) forwards;
+    }
+    @keyframes slideUp {
+      from { transform: translateX(-50%) translateY(40px); opacity: 0; }
+      to { transform: translateX(-50%) translateY(0); opacity: 1; }
+    }
+
+    .team-panel {
+      flex: 1;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .team-left { background: linear-gradient(135deg, #1e40af, #1d4ed8); }
+    .team-right { background: linear-gradient(135deg, #dc2626, #b91c1c); }
+
+    .team-name {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: #ffffff;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .team-left .team-name { text-align: right; }
+
+    .score-display {
+      font-size: 2.8rem;
+      font-weight: 900;
+      color: #ffffff;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      min-width: 50px;
+      text-align: center;
+      line-height: 1;
+    }
+
+    .vs-divider {
+      width: 60px;
+      background: linear-gradient(180deg, #0f172a, #1e293b);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+    .vs-text { font-size: 0.7rem; font-weight: 900; color: #94a3b8; letter-spacing: 2px; }
+    .vs-court { font-size: 0.65rem; font-weight: 700; color: #f97316; }
+    .vs-event { font-size: 0.6rem; color: #64748b; }
+
+    /* === 서브 인디케이터 === */
+    .serve-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 8px #22c55e;
+      animation: pulse-dot 1.5s infinite;
+      flex-shrink: 0;
+    }
+    @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    /* === 상단 정보 바 === */
+    .info-bar {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(15,23,42,0.85);
+      backdrop-filter: blur(12px);
+      border-radius: 12px;
+      padding: 8px 18px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      opacity: 0;
+      animation: fadeIn 0.8s 0.3s forwards;
+    }
+    @keyframes fadeIn { to { opacity: 1; } }
+    .info-item { font-size: 0.78rem; color: #94a3b8; font-weight: 600; }
+    .info-highlight { color: #f97316; font-weight: 800; }
+    .info-live {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 0.75rem; font-weight: 800; color: #ef4444;
+    }
+    .info-live-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #ef4444;
+      animation: pulse-dot 1s infinite;
+    }
+
+    /* === 승률 바 === */
+    .predict-bar {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(15,23,42,0.7);
+      backdrop-filter: blur(8px);
+      border-radius: 10px;
+      padding: 6px 14px;
+      min-width: 400px;
+      opacity: 0;
+      animation: fadeIn 1s 0.6s forwards;
+    }
+    .predict-label { font-size: 0.7rem; color: #94a3b8; font-weight: 700; flex-shrink: 0; }
+    .predict-track { flex: 1; height: 6px; border-radius: 3px; overflow: hidden; display: flex; background: #334155; }
+    .predict-fill-left { height: 100%; background: #3b82f6; transition: width 1s; }
+    .predict-fill-right { height: 100%; background: #ef4444; transition: width 1s; }
+    .predict-pct { font-size: 0.72rem; font-weight: 800; min-width: 36px; text-align: center; }
+    .predict-pct-left { color: #60a5fa; }
+    .predict-pct-right { color: #f87171; }
+
+    /* === 대기 화면 === */
+    .waiting {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15,23,42,0.8);
+      backdrop-filter: blur(12px);
+      border-radius: 16px;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+    }
+    .waiting-text { font-size: 1rem; font-weight: 700; color: #94a3b8; }
+    .waiting-court { font-size: 1.2rem; font-weight: 900; color: #f97316; }
+
+    /* === 경기 완료 === */
+    .finished {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, rgba(16,185,129,0.9), rgba(5,150,105,0.9));
+      backdrop-filter: blur(12px);
+      border-radius: 16px;
+      padding: 16px 40px;
+      text-align: center;
+      box-shadow: 0 8px 40px rgba(16,185,129,0.3);
+    }
+    .finished-title { font-size: 1.3rem; font-weight: 900; color: #fff; margin-bottom: 4px; }
+    .finished-winner { font-size: 1rem; font-weight: 700; color: rgba(255,255,255,0.9); }
+  </style>
+</head>
+<body>
+  <div id="overlay-app"></div>
+
+  <script>
+    'use strict';
+    const params = new URLSearchParams(location.search);
+    const tid = params.get('tid');
+    const courtNum = params.get('court');
+    const position = params.get('pos') || 'bottom'; // bottom | top
+    let matchData = null;
+    let tInfo = null;
+
+    async function fetchData() {
+      if (!tid || !courtNum) return;
+      try {
+        const [courtRes, tRes] = await Promise.all([
+          fetch('/api/tournaments/' + tid + '/court/' + courtNum),
+          fetch('/api/tournaments/' + tid)
+        ]);
+        if (courtRes.ok) {
+          const data = await courtRes.json();
+          matchData = data.current || null;
+        }
+        if (tRes.ok) tInfo = await tRes.json();
+        renderOverlay();
+      } catch (e) { console.error(e); }
+    }
+
+    function renderOverlay() {
+      const app = document.getElementById('overlay-app');
+      if (!matchData) {
+        app.innerHTML = '<div class="waiting"><span class="waiting-court">코트 ' + (courtNum || '?') + '</span><span class="waiting-text">대기 중</span></div>';
+        return;
+      }
+
+      const m = matchData;
+      const t1 = m.team1_name || '팀1';
+      const t2 = m.team2_name || '팀2';
+      const s1 = m.team1_set1 || 0;
+      const s2 = m.team2_set1 || 0;
+      const isTennis = tInfo?.sport_type === 'tennis';
+      const eventName = m.event_name || '';
+
+      if (m.status === 'completed') {
+        const winner = m.winner_team === 1 ? t1 : t2;
+        app.innerHTML = '<div class="finished"><div class="finished-title">🏆 경기 종료</div><div class="finished-winner">' + winner + ' 승리 (' + s1 + ' : ' + s2 + ')</div></div>';
+        return;
+      }
+
+      // 승률 예측 (간이 계산)
+      const total = s1 + s2 || 1;
+      const p1Pct = Math.round((s1 / total) * 100) || 50;
+      const p2Pct = 100 - p1Pct;
+
+      const sportIcon = isTennis ? '🎾' : '🏸';
+      const setInfo = isTennis ? ' · 게임 ' + (m.team1_set2 || 0) + '-' + (m.team2_set2 || 0) : '';
+
+      app.innerHTML = \`
+        <div class="info-bar">
+          <div class="info-live"><div class="info-live-dot"></div>LIVE</div>
+          <div class="info-item">\${sportIcon} \${tInfo?.name || '대회'}</div>
+          <div class="info-item">코트 <span class="info-highlight">\${courtNum}</span></div>
+          <div class="info-item">\${eventName}\${setInfo}</div>
+        </div>
+
+        <div class="score-bar">
+          <div class="team-panel team-left">
+            <div class="team-name">\${t1}</div>
+            <div class="score-display">\${s1}</div>
+          </div>
+
+          <div class="vs-divider">
+            <div class="vs-text">VS</div>
+            <div class="vs-court">C\${courtNum}</div>
+            <div class="vs-event">R\${m.round || 0}</div>
+          </div>
+
+          <div class="team-panel team-right">
+            <div class="score-display">\${s2}</div>
+            <div class="team-name">\${t2}</div>
+          </div>
+        </div>
+
+        <div class="predict-bar">
+          <span class="predict-pct predict-pct-left">\${p1Pct}%</span>
+          <div class="predict-track">
+            <div class="predict-fill-left" style="width:\${p1Pct}%"></div>
+            <div class="predict-fill-right" style="width:\${p2Pct}%"></div>
+          </div>
+          <span class="predict-pct predict-pct-right">\${p2Pct}%</span>
+        </div>
+      \`;
+    }
+
+    // WebSocket 실시간 업데이트
+    function connectWS() {
+      if (!tid) return;
+      try {
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(proto + '//' + location.host + '/api/live/' + tid);
+        ws.onmessage = () => fetchData();
+        ws.onclose = () => setTimeout(connectWS, 5000);
+      } catch (e) {}
+    }
+
+    // Init
+    fetchData();
+    setInterval(fetchData, 5000);
+    connectWS();
+  </script>
+</body>
+</html>`)
+})
+
 // ⌚ Smartwatch Score UI
 app.get('/watch', (c) => {
   const params = new URLSearchParams(c.req.url.split('?')[1] || '')
