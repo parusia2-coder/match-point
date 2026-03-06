@@ -191,7 +191,11 @@ app.delete('/:id', async (c) => {
     try {
         const id = c.req.param('id')
         const user = c.get('adminUser') as any
-        const body = await c.req.json().catch(() => ({})) as any
+        let body: any = {}
+        try {
+            const rawBody = await c.req.text()
+            if (rawBody) body = JSON.parse(rawBody)
+        } catch (e) { body = {} }
 
         const existing = await c.env.DB.prepare('SELECT * FROM tournaments WHERE id = ? AND deleted = 0').bind(id).first() as any
         if (!existing) return c.json({ error: 'Not found' }, 404)
