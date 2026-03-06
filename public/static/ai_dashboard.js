@@ -474,3 +474,267 @@ async function validateMatchScore(tid, matchId, scoreData) {
     return true; // API 실패 시 그냥 통과
   }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 📊 선수 프로필 상세 (성장 곡선)
+// ═══════════════════════════════════════════════════════════════
+async function showPlayerGrowthProfile(memberId) {
+  showModal('📊 선수 성장 분석', `
+    <div class="loading" style="padding:40px 0;">
+      <div class="spinner"></div>데이터 분석 중...
+    </div>
+  `, null, { confirmText: '닫기', wide: true, hideCancel: true });
+
+  try {
+    const data = await rankingApi(`/member/${memberId}/growth`);
+    const m = data.member;
+    const html = renderGrowthProfileHtml(data, m);
+    const mb = document.querySelector('.modal-body');
+    if (mb) mb.innerHTML = html;
+    document.querySelector('.modal')?.classList.add('modal-wide');
+  } catch (e) {
+    const mb = document.querySelector('.modal-body');
+    if (mb) mb.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><p>${e.message}</p></div>`;
+  }
+}
+
+function renderGrowthProfileHtml(data, m) {
+  const elo = data.elo_history || [];
+  const monthly = data.monthly_stats || [];
+  const rivals = data.rivals || [];
+  const insights = data.growth_insights || [];
+
+  // Elo 성장 곡선 SVG
+  let eloChartSvg = '';
+  if (elo.length >= 2) {
+    const W = 480, H = 160, pad = 30;
+    const values = elo.map(e => e.new_elo);
+    const minV = Math.min(...values) - 20;
+    const maxV = Math.max(...values) + 20;
+    const rangeV = maxV - minV || 1;
+    const points = elo.map((e, i) => {
+      const x = pad + (i / (elo.length - 1)) * (W - pad * 2);
+      const y = H - pad - ((e.new_elo - minV) / rangeV) * (H - pad * 2);
+      return `${x},${y}`;
+    });
+    const polyline = points.join(' ');
+    // Fill area
+    const firstX = pad, lastX = pad + ((elo.length - 1) / (elo.length - 1)) * (W - pad * 2);
+    const fillPoints = `${firstX},${H - pad} ${polyline} ${lastX},${H - pad}`;
+
+    eloChartSvg = `
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-height:180px;">
+        <defs>
+          <linearGradient id="eloGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="rgba(249,115,22,0.3)"/>
+            <stop offset="100%" stop-color="rgba(249,115,22,0)"/>
+          </linearGradient>
+        </defs>
+        <!-- Grid -->
+        <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${H - pad}" stroke="#e2e8f0" stroke-width="1"/>
+        <line x1="${pad}" y1="${H - pad}" x2="${W - pad}" y2="${H - pad}" stroke="#e2e8f0" stroke-width="1"/>
+        <!-- Labels -->
+        <text x="${pad - 4}" y="${pad + 4}" text-anchor="end" fill="#94a3b8" font-size="9">${maxV}</text>
+        <text x="${pad - 4}" y="${H - pad + 4}" text-anchor="end" fill="#94a3b8" font-size="9">${minV}</text>
+        <!-- Fill -->
+        <polygon points="${fillPoints}" fill="url(#eloGrad)"/>
+        <!-- Line -->
+        <polyline points="${polyline}" fill="none" stroke="#f97316" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- Dots -->
+        ${elo.map((e, i) => {
+      const x = pad + (i / (elo.length - 1)) * (W - pad * 2);
+      const y = H - pad - ((e.new_elo - minV) / rangeV) * (H - pad * 2);
+      const color = e.delta >= 0 ? '#10b981' : '#ef4444';
+      return `<circle cx="${x}" cy="${y}" r="3" fill="${color}" stroke="#fff" stroke-width="1.5"/>`;
+    }).join('')}
+      </svg>`;
+  }
+
+  // 월별 승률 바 차트
+  const monthlyHtml = monthly.map(m => {
+    const rate = m.win_rate || 0;
+    const color = rate >= 70 ? '#10b981' : rate >= 50 ? '#3b82f6' : rate >= 30 ? '#f59e0b' : '#ef4444';
+    return `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+        <div style="width:60px;font-size:0.75rem;color:#64748b;text-align:right;flex-shrink:0;">${m.month}</div>
+        <div style="flex:1;height:16px;background:#f1f5f9;border-radius:8px;overflow:hidden;position:relative;">
+          <div style="height:100%;width:${rate}%;background:${color};border-radius:8px;transition:width 0.5s;"></div>
+        </div>
+        <div style="width:65px;font-size:0.75rem;font-weight:700;color:${color};flex-shrink:0;">${rate}% (${m.games}전)</div>
+      </div>`;
+  }).join('');
+
+  // 상대 전적 히트맵
+  const rivalsHtml = rivals.map((r, i) => {
+    const rate = r.win_rate || 0;
+    const bg = rate >= 70 ? 'rgba(16,185,129,0.08)' : rate <= 30 ? 'rgba(239,68,68,0.06)' : 'rgba(59,130,246,0.04)';
+    const color = rate >= 70 ? '#10b981' : rate <= 30 ? '#ef4444' : '#3b82f6';
+    return `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:10px;background:${bg};margin-bottom:4px;">
+        <div style="flex:1;font-weight:700;font-size:0.85rem;color:#0f172a;">${r.opp_names}</div>
+        <div style="font-size:0.82rem;color:#64748b;">${r.games}전 ${r.wins}승</div>
+        <div style="font-size:0.88rem;font-weight:800;color:${color};">${rate}%</div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="ai-dash">
+      <!-- 선수 헤더 -->
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding:20px;background:linear-gradient(135deg,rgba(249,115,22,0.04),rgba(251,191,36,0.04));border-radius:16px;border:1px solid rgba(249,115,22,0.1);">
+        <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#f97316,#f59e0b);display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:#fff;font-weight:900;flex-shrink:0;">
+          ${m.name?.charAt(0) || '?'}
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:1.2rem;font-weight:900;color:#0f172a;">${m.name}</div>
+          <div style="font-size:0.85rem;color:#64748b;">${m.club || '-'} · ${m.gender === 'm' ? '남' : '여'} · ${(m.level || '-').toUpperCase()}급</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:2rem;font-weight:900;color:#f97316;">${m.elo_rating}</div>
+          <div style="font-size:0.75rem;color:#94a3b8;">최고 ${m.elo_peak}</div>
+        </div>
+      </div>
+
+      <!-- Elo 성장 곡선 -->
+      ${elo.length >= 2 ? `
+        <div class="ai-section">
+          <div class="ai-section-title">📈 Elo 성장 곡선</div>
+          <div class="ai-card">${eloChartSvg}</div>
+        </div>
+      ` : ''}
+
+      <!-- 월별 승률 추이 -->
+      ${monthly.length > 0 ? `
+        <div class="ai-section">
+          <div class="ai-section-title">📅 월별 승률 추이</div>
+          <div class="ai-card">${monthlyHtml}</div>
+        </div>
+      ` : ''}
+
+      <!-- 상대 전적 TOP 10 -->
+      ${rivals.length > 0 ? `
+        <div class="ai-section">
+          <div class="ai-section-title">⚔️ 상대별 전적 (${rivals.length}명)</div>
+          <div class="ai-card" style="padding:8px;">${rivalsHtml}</div>
+        </div>
+      ` : ''}
+
+      <!-- AI 성장 인사이트 -->
+      ${insights.length > 0 ? `
+        <div class="ai-section">
+          <div class="ai-section-title">💡 AI 성장 분석</div>
+          ${insights.map(i => `<div class="ai-insight">${i}</div>`).join('')}
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 🔮 승률 예측 
+// ═══════════════════════════════════════════════════════════════
+async function showWinPrediction(player1Id, player2Id) {
+  if (!player1Id || !player2Id) {
+    showToast('두 선수를 선택해주세요.', 'warning');
+    return;
+  }
+
+  showModal('🔮 승률 예측', `
+    <div class="loading" style="padding:40px 0;">
+      <div class="spinner"></div>AI 분석 중...
+    </div>
+  `, null, { confirmText: '닫기', wide: true, hideCancel: true });
+
+  try {
+    const data = await rankingApi(`/predict?player1=${player1Id}&player2=${player2Id}`);
+    const p = data.prediction;
+    const p1 = p.player1, p2 = p.player2;
+
+    const html = `
+      <div class="ai-dash">
+        <!-- 대결 헤더 -->
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+          <!-- Player 1 -->
+          <div style="flex:1;text-align:center;">
+            <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:inline-flex;align-items:center;justify-content:center;font-size:1.5rem;color:#fff;font-weight:900;">
+              ${p1.name?.charAt(0) || '?'}
+            </div>
+            <div style="font-weight:800;font-size:1rem;color:#0f172a;margin-top:6px;">${p1.name}</div>
+            <div style="font-size:0.78rem;color:#64748b;">${p1.club || '-'} · ${(p1.level || '-').toUpperCase()}급</div>
+            <div style="font-size:1.5rem;font-weight:900;color:#3b82f6;margin-top:4px;">${p1.elo}</div>
+            <div style="font-size:0.75rem;color:#94a3b8;">${p1.total_games}전 ${p1.wins}승 (${p1.win_rate}%)</div>
+          </div>
+
+          <!-- VS -->
+          <div style="font-size:1.5rem;font-weight:900;color:#94a3b8;flex-shrink:0;">VS</div>
+
+          <!-- Player 2 -->
+          <div style="flex:1;text-align:center;">
+            <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#ef4444,#dc2626);display:inline-flex;align-items:center;justify-content:center;font-size:1.5rem;color:#fff;font-weight:900;">
+              ${p2.name?.charAt(0) || '?'}
+            </div>
+            <div style="font-weight:800;font-size:1rem;color:#0f172a;margin-top:6px;">${p2.name}</div>
+            <div style="font-size:0.78rem;color:#64748b;">${p2.club || '-'} · ${(p2.level || '-').toUpperCase()}급</div>
+            <div style="font-size:1.5rem;font-weight:900;color:#ef4444;margin-top:4px;">${p2.elo}</div>
+            <div style="font-size:0.75rem;color:#94a3b8;">${p2.total_games}전 ${p2.wins}승 (${p2.win_rate}%)</div>
+          </div>
+        </div>
+
+        <!-- 예상 승률 바 -->
+        <div style="margin-bottom:24px;">
+          <div style="display:flex;justify-content:space-between;font-size:0.85rem;font-weight:800;margin-bottom:6px;">
+            <span style="color:#3b82f6;">${p1.predicted_win_prob}%</span>
+            <span style="color:#94a3b8;">예상 승률</span>
+            <span style="color:#ef4444;">${p2.predicted_win_prob}%</span>
+          </div>
+          <div style="height:20px;border-radius:10px;overflow:hidden;display:flex;background:#f1f5f9;">
+            <div style="width:${p1.predicted_win_prob}%;background:linear-gradient(90deg,#3b82f6,#60a5fa);transition:width 1s;"></div>
+            <div style="width:${p2.predicted_win_prob}%;background:linear-gradient(90deg,#f87171,#ef4444);transition:width 1s;"></div>
+          </div>
+        </div>
+
+        <!-- 신뢰도 -->
+        <div style="text-align:center;margin-bottom:16px;">
+          <span style="background:rgba(16,185,129,0.1);color:#10b981;padding:4px 14px;border-radius:10px;font-size:0.82rem;font-weight:700;">
+            🎯 예측 신뢰도: ${data.confidence}%
+          </span>
+        </div>
+
+        <!-- 상대 전적 -->
+        ${data.head_to_head.total > 0 ? `
+          <div class="ai-card" style="margin-bottom:16px;text-align:center;padding:16px;">
+            <div style="font-weight:800;font-size:0.9rem;color:#0f172a;margin-bottom:8px;">⚔️ 직접 대결 전적</div>
+            <div style="font-size:1.8rem;font-weight:900;">
+              <span style="color:#3b82f6;">${data.head_to_head.player1_wins}</span>
+              <span style="color:#94a3b8;font-size:1rem;margin:0 8px;">-</span>
+              <span style="color:#ef4444;">${data.head_to_head.player2_wins}</span>
+            </div>
+            <div style="font-size:0.78rem;color:#94a3b8;margin-top:4px;">${data.head_to_head.total}전</div>
+          </div>
+        ` : ''}
+
+        <!-- AI 분석 메시지 -->
+        ${data.messages.map(msg => `<div class="ai-insight">${msg}</div>`).join('')}
+
+        <!-- 상세 프로필 버튼 -->
+        <div style="display:flex;gap:8px;margin-top:16px;">
+          <button onclick="closeModal();showPlayerGrowthProfile(${p1.id})" class="btn" 
+            style="flex:1;padding:10px;border-radius:10px;background:rgba(59,130,246,0.1);color:#3b82f6;border:1px solid rgba(59,130,246,0.2);cursor:pointer;font-weight:700;font-size:0.85rem;">
+            📊 ${p1.name} 프로필
+          </button>
+          <button onclick="closeModal();showPlayerGrowthProfile(${p2.id})" class="btn"
+            style="flex:1;padding:10px;border-radius:10px;background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.2);cursor:pointer;font-weight:700;font-size:0.85rem;">
+            📊 ${p2.name} 프로필
+          </button>
+        </div>
+      </div>
+    `;
+
+    const mb = document.querySelector('.modal-body');
+    if (mb) mb.innerHTML = html;
+    document.querySelector('.modal')?.classList.add('modal-wide');
+  } catch (e) {
+    const mb = document.querySelector('.modal-body');
+    if (mb) mb.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><p>${e.message}</p></div>`;
+  }
+}
+
