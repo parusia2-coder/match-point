@@ -1,4 +1,5 @@
-// ===== 코트 점수판 v2.0 - Club Tournament Scoreboard =====
+// ===== 코트 점수판 v3.0 - Club Tournament Scoreboard =====
+// PWA Enhanced: Offline mode + Judge quick-access + Sound/Vibration
 'use strict';
 
 const params = new URLSearchParams(location.search);
@@ -7,6 +8,7 @@ const courtNum = params.get('court');
 const locked = params.get('locked') === '1';
 const autoNext = params.get('autonext') === 'true';
 const vid = params.get('vid') || '';
+const judgeMode = params.get('judge') === '1'; // 심판 퀵모드
 
 let viewMode = (tid && courtNum) ? 'scoreboard' : (tid ? 'center' : 'list');
 
@@ -20,6 +22,159 @@ let courtCenterData = [];
 let venuesData = [];
 let tInfo = null;
 let centerTab = 'status';
+let isOnline = navigator.onLine;
+
+// =========================================================
+//  🔌 오프라인 큐 시스템 (IndexedDB)
+// =========================================================
+const OFFLINE_DB = 'mp_offline_queue';
+const OFFLINE_STORE = 'score_queue';
+
+function openOfflineDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(OFFLINE_DB, 1);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(OFFLINE_STORE)) {
+        db.createObjectStore(OFFLINE_STORE, { keyPath: 'id', autoIncrement: true });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function enqueueOffline(data) {
+  try {
+    const db = await openOfflineDB();
+    const tx = db.transaction(OFFLINE_STORE, 'readwrite');
+    tx.objectStore(OFFLINE_STORE).add({ ...data, timestamp: Date.now() });
+    await new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = reject; });
+    showOfflineToast('📴 오프라인 저장됨 — 온라인 복구 시 자동 동기화');
+  } catch (e) { console.error('Offline enqueue failed:', e); }
+}
+
+async function syncOfflineQueue() {
+  try {
+    const db = await openOfflineDB();
+    const tx = db.transaction(OFFLINE_STORE, 'readonly');
+    const store = tx.objectStore(OFFLINE_STORE);
+    const items = await new Promise((resolve, reject) => {
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+
+    if (items.length === 0) return;
+    showOfflineToast(`🔄 ${items.length}건 동기화 중...`);
+
+    for (const item of items) {
+      try {
+        await fetch(item.url, {
+          method: item.method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(item.body)
+        });
+        // 성공 → 큐에서 제거
+        const delTx = db.transaction(OFFLINE_STORE, 'readwrite');
+        delTx.objectStore(OFFLINE_STORE).delete(item.id);
+      } catch (e) { break; } // 아직 오프라인이면 중단
+    }
+    showOfflineToast('✅ 오프라인 데이터 동기화 완료!');
+  } catch (e) { console.error('Sync failed:', e); }
+}
+
+function showOfflineToast(msg) {
+  let toast = document.getElementById('offlineToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'offlineToast';
+    toast.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);padding:10px 20px;background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:12px;color:#f8fafc;font-size:0.85rem;font-weight:600;z-index:99999;transition:opacity 0.5s;pointer-events:none;';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  setTimeout(() => { toast.style.opacity = '0'; }, 3000);
+}
+
+// Online/Offline 감지
+window.addEventListener('online', () => {
+  isOnline = true;
+  syncOfflineQueue();
+  showOfflineToast('🟢 온라인 복구!');
+});
+window.addEventListener('offline', () => {
+  isOnline = false;
+  showOfflineToast('📴 오프라인 모드 — 점수 입력은 계속 가능합니다');
+});
+
+// =========================================================
+//  🔊 소리/진동 피드백 시스템
+// =========================================================
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+
+function ensureAudioCtx() {
+  if (!audioCtx) audioCtx = new AudioCtx();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playScoreSound() {
+  try {
+    const ctx = ensureAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.15);
+  } catch (e) { }
+}
+
+function playFinishSound() {
+  try {
+    const ctx = ensureAudioCtx();
+    [523, 659, 784, 1047].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'triangle';
+      gain.gain.setValueAtTime(0.12, ctx.currentTime + i * 0.15);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.15 + 0.3);
+      osc.start(ctx.currentTime + i * 0.15);
+      osc.stop(ctx.currentTime + i * 0.15 + 0.3);
+    });
+  } catch (e) { }
+}
+
+function playCourtChangeSound() {
+  try {
+    const ctx = ensureAudioCtx();
+    [440, 554, 659].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'square';
+      gain.gain.setValueAtTime(0.08, ctx.currentTime + i * 0.2);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.2 + 0.25);
+      osc.start(ctx.currentTime + i * 0.2);
+      osc.stop(ctx.currentTime + i * 0.2 + 0.25);
+    });
+  } catch (e) { }
+}
+
+function vibrateStrong() {
+  if (navigator.vibrate) navigator.vibrate([100, 50, 200]);
+}
 
 // === Game State (핵심) ===
 let gameState = {
@@ -154,7 +309,8 @@ function renderCourtCenter(app) {
       <div style="display:flex;gap:12px;justify-content:center;">
         <button onclick="window.open('/board?tid=${tid}${vid ? '&vid=' + vid : ''}', '_blank')" style="padding:10px 20px;background:#252d3a;border:1px solid #3b82f6;border-radius:8px;color:#60a5fa;cursor:pointer;font-weight:700;display:flex;align-items:center;gap:8px;">📺 대형 전광판</button>
         <button onclick="showQRCodeModal()" style="padding:10px 20px;background:#312e81;border:1px solid #4f46e5;border-radius:8px;color:#c7d2fe;cursor:pointer;font-weight:700;display:flex;align-items:center;gap:8px;">📱 QR 코드 생성</button>
-      </div>
+          <button onclick="enterJudgeMode()" style="padding:10px 20px;background:linear-gradient(135deg,#f97316,#ef4444);border:none;border-radius:8px;color:#fff;cursor:pointer;font-weight:700;display:flex;align-items:center;gap:8px;">👨‍⚖️ 심판 퀵모드</button>
+        </div>
     </div>
 
     <!-- 코트 그리드 -->
@@ -954,7 +1110,8 @@ window.addScore = function (teamIdx, event) {
     createParticles(event.clientX, event.clientY, teamIdx === gameState.leftTeamIdx ? '#0ea5e9' : '#f43f5e');
   }
 
-  // 진동 피드백 (모바일)
+  // 🔊 소리 + 진동 피드백
+  playScoreSound();
   if (navigator.vibrate) navigator.vibrate(30);
 
   // 서버 저장 (게임 도중)
@@ -1060,20 +1217,59 @@ window.undoLast = function () {
 
 async function saveScore() {
   if (!currentMatch) return;
-  await fetch('/api/tournaments/' + tid + '/matches/' + currentMatch.id + '/score', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      team1_set1: currentMatch.team1_set1 || 0, team1_set2: currentMatch.team1_set2 || 0, team1_set3: currentMatch.team1_set3 || 0,
-      team2_set1: currentMatch.team2_set1 || 0, team2_set2: currentMatch.team2_set2 || 0, team2_set3: currentMatch.team2_set3 || 0,
-      winner_team: currentMatch.winner_team || null,
-      status: currentMatch.status || 'playing',
-      court_swapped: gameState.leftTeamIdx === 2 ? 1 : 0
-    })
-  });
+  const url = '/api/tournaments/' + tid + '/matches/' + currentMatch.id + '/score';
+  const body = {
+    team1_set1: currentMatch.team1_set1 || 0, team1_set2: currentMatch.team1_set2 || 0, team1_set3: currentMatch.team1_set3 || 0,
+    team2_set1: currentMatch.team2_set1 || 0, team2_set2: currentMatch.team2_set2 || 0, team2_set3: currentMatch.team2_set3 || 0,
+    winner_team: currentMatch.winner_team || null,
+    status: currentMatch.status || 'playing',
+    court_swapped: gameState.leftTeamIdx === 2 ? 1 : 0
+  };
+
+  if (!isOnline) {
+    // 📴 오프라인 → IndexedDB 큐에 저장
+    await enqueueOffline({ url, method: 'PUT', body });
+    return;
+  }
+
+  try {
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    // 경기 완료 시 다음 경기 제안 처리
+    if (res.ok && currentMatch.status === 'completed') {
+      try {
+        const data = await res.json();
+        if (data.next_suggestion) {
+          showNextMatchToast(data.next_suggestion);
+        }
+      } catch (e) { }
+    }
+  } catch (e) {
+    // 네트워크 에러 → 오프라인 큐로
+    await enqueueOffline({ url, method: 'PUT', body });
+  }
+}
+
+function showNextMatchToast(suggestion) {
+  let toast = document.getElementById('nextMatchToast');
+  if (toast) toast.remove();
+  toast = document.createElement('div');
+  toast.id = 'nextMatchToast';
+  toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:16px 24px;background:linear-gradient(135deg,#10b981,#059669);border-radius:16px;color:#fff;font-size:1rem;font-weight:700;z-index:99999;box-shadow:0 8px 30px rgba(16,185,129,0.4);cursor:pointer;display:flex;align-items:center;gap:12px;';
+  toast.innerHTML = `<span style="font-size:1.5rem;">▶️</span><div><div>다음 경기 준비됨</div><div style="font-size:0.82rem;font-weight:500;opacity:0.9;">${suggestion.teams}</div></div>`;
+  toast.onclick = () => { toast.remove(); };
+  document.body.appendChild(toast);
+  setTimeout(() => { if (toast.parentNode) toast.remove(); }, 8000);
 }
 
 async function finishAndLoadNext() {
+  // 🔊 경기 종료 사운드 + 진동
+  playFinishSound();
+  vibrateStrong();
+
   // 다음 경기 자동 시작
   if (autoNext) {
     try {
@@ -1181,6 +1377,46 @@ window.goToCourtCenter = function () {
   }
   if (gameState.timerInterval) clearInterval(gameState.timerInterval);
   location.href = '/court?tid=' + tid + (vid ? '&vid=' + vid : '');
+};
+
+// =========================================================
+//  👨‍⚖️ 심판 퀵모드 (코트 선택 → 바로 점수 입력)
+// =========================================================
+window.enterJudgeMode = function () {
+  // 심판 퀵모드: 코트 목록을 큰 버튼으로 표시
+  const courts = courtCenterData || [];
+  const modal = document.createElement('div');
+  modal.id = 'judgeModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.9);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;padding:20px;font-family:Pretendard,sans-serif;';
+
+  let html = `
+    <div style="text-align:center;margin-bottom:30px;">
+      <div style="font-size:3rem;margin-bottom:12px;">👨‍⚖️</div>
+      <h2 style="font-size:1.8rem;font-weight:900;color:#f8fafc;margin:0 0 8px;">심판 전용 모드</h2>
+      <p style="color:#94a3b8;font-size:1rem;margin:0;">코트를 터치하면 바로 점수 입력 화면으로 이동합니다</p>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px;width:100%;max-width:600px;">`;
+
+  courts.forEach(c => {
+    const hasMatch = c.current;
+    const bg = hasMatch ? 'linear-gradient(135deg,#10b981,#059669)' : 'linear-gradient(135deg,#334155,#1e293b)';
+    const shadow = hasMatch ? '0 8px 25px rgba(16,185,129,0.3)' : 'none';
+    const matchInfo = hasMatch ? `${c.current.team1_name || '?'} vs ${c.current.team2_name || '?'}` : `대기 ${c.pending}경기`;
+    html += `
+      <button onclick="location.href='/court?tid=${tid}&court=${c.court}${vid ? '&vid=' + vid : ''}&judge=1'" 
+        style="padding:24px 16px;background:${bg};border:none;border-radius:20px;cursor:pointer;text-align:center;box-shadow:${shadow};transition:transform 0.15s;"
+        ontouchstart="this.style.transform='scale(0.95)'" ontouchend="this.style.transform='scale(1)'">
+        <div style="font-size:2.5rem;font-weight:900;color:#fff;line-height:1;margin-bottom:8px;">${c.court}</div>
+        <div style="font-size:0.85rem;font-weight:700;color:rgba(255,255,255,0.8);">${c.court}번 코트</div>
+        <div style="font-size:0.75rem;color:rgba(255,255,255,0.6);margin-top:4px;">${matchInfo}</div>
+      </button>`;
+  });
+
+  html += `</div>
+    <button onclick="document.getElementById('judgeModal').remove()" style="margin-top:24px;padding:12px 32px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:12px;color:#94a3b8;cursor:pointer;font-weight:700;font-size:1rem;">← 닫기</button>`;
+
+  modal.innerHTML = html;
+  document.body.appendChild(modal);
 };
 
 // =========================================================
