@@ -94,6 +94,34 @@ app.put('/:tid/matches/:mid/score', async (c) => {
     // Broadcast update via WebSocket
     broadcastUpdate(tid, { type: 'update', message: 'Score updated', match_id: mid })
 
+    // 경기 완료 시 다음 경기 제안 정보 포함
+    if (status === 'completed' && oldMatch.court_number) {
+        const nextOnCourt = await c.env.DB.prepare(`
+            SELECT m.id, m.court_number,
+                   t1.team_name as team1_name, t2.team_name as team2_name,
+                   e.name as event_name
+            FROM matches m
+            LEFT JOIN teams t1 ON m.team1_id = t1.id
+            LEFT JOIN teams t2 ON m.team2_id = t2.id
+            LEFT JOIN events e ON m.event_id = e.id
+            WHERE m.tournament_id = ? AND m.court_number = ? AND m.status = 'pending'
+            ORDER BY CASE WHEN m.scheduled_time IS NOT NULL THEN 0 ELSE 1 END,
+                     m.scheduled_time ASC, m.round ASC, m.match_order ASC
+            LIMIT 1
+        `).bind(tid, oldMatch.court_number).first() as any
+        if (nextOnCourt) {
+            return c.json({
+                success: true,
+                next_suggestion: {
+                    match_id: nextOnCourt.id,
+                    court: nextOnCourt.court_number,
+                    teams: `${nextOnCourt.team1_name} vs ${nextOnCourt.team2_name}`,
+                    event: nextOnCourt.event_name
+                }
+            })
+        }
+    }
+
     return c.json({ success: true })
 })
 
@@ -815,5 +843,394 @@ async function saveMemberMatchRecords(
         console.error('saveMemberMatchRecords error:', e)
     }
 }
+
+
+// ═══════════════════════════════════════════════════════════════
+// 🚨  기능 1: 경기 지연/이상 자동 모니터링
+// ═══════════════════════════════════════════════════════════════
+app.get('/:tid/monitoring', async (c) => {
+    const tid = c.req.param('tid')
+    const tournament = await c.env.DB.prepare(
+        'SELECT * FROM tournaments WHERE id = ? AND deleted = 0'
+    ).bind(tid).first() as any
+    if (!tournament) return c.json({ error: 'Not found' }, 404)
+
+    const now = new Date()
+    const nowISO = now.toISOString()
+    const alerts: any[] = []
+
+    // ── 1) 지연 감지: 예정 시간 5분 이상 초과한 대기 경기 ──
+    const { results: delayed } = await c.env.DB.prepare(`
+        SELECT m.id, m.court_number, m.scheduled_time, m.round, m.match_order,
+               t1.team_name as team1_name, t2.team_name as team2_name,
+               e.name as event_name
+        FROM matches m
+        LEFT JOIN teams t1 ON m.team1_id = t1.id
+        LEFT JOIN teams t2 ON m.team2_id = t2.id
+        LEFT JOIN events e ON m.event_id = e.id
+        WHERE m.tournament_id = ? AND m.status = 'pending'
+          AND m.scheduled_time IS NOT NULL 
+          AND m.scheduled_time < datetime('now', '-5 minutes')
+        ORDER BY m.scheduled_time ASC
+    `).bind(tid).all() as any
+
+    for (const d of (delayed || [])) {
+        const scheduled = new Date(d.scheduled_time)
+        const diffMin = Math.round((now.getTime() - scheduled.getTime()) / 60000)
+        alerts.push({
+            type: 'delay',
+            severity: diffMin > 15 ? 'critical' : 'warning',
+            icon: '⏰',
+            match_id: d.id,
+            court: d.court_number,
+            event: d.event_name,
+            teams: `${d.team1_name} vs ${d.team2_name}`,
+            message: `${d.court_number}번 코트 경기가 ${diffMin}분 지연 중입니다`,
+            detail: `예정: ${d.scheduled_time} | ${d.team1_name} vs ${d.team2_name}`,
+            delay_minutes: diffMin
+        })
+    }
+
+    // ── 2) 장시간 진행 경기: 평균 시간의 2배 초과 ──
+    const avgDuration = tournament.sport_type === 'tennis' ? 40 : 20 // 기본 평균(분)
+    const { results: longMatches } = await c.env.DB.prepare(`
+        SELECT m.id, m.court_number, m.updated_at,
+               t1.team_name as team1_name, t2.team_name as team2_name,
+               e.name as event_name,
+               m.team1_set1, m.team2_set1, m.team1_set2, m.team2_set2
+        FROM matches m
+        LEFT JOIN teams t1 ON m.team1_id = t1.id
+        LEFT JOIN teams t2 ON m.team2_id = t2.id
+        LEFT JOIN events e ON m.event_id = e.id
+        WHERE m.tournament_id = ? AND m.status = 'playing'
+    `).bind(tid).all() as any
+
+    for (const lm of (longMatches || [])) {
+        const started = new Date(lm.updated_at)
+        const elapsed = Math.round((now.getTime() - started.getTime()) / 60000)
+        if (elapsed > avgDuration * 2) {
+            alerts.push({
+                type: 'long_match',
+                severity: elapsed > avgDuration * 3 ? 'critical' : 'warning',
+                icon: '⌛',
+                match_id: lm.id,
+                court: lm.court_number,
+                event: lm.event_name,
+                teams: `${lm.team1_name} vs ${lm.team2_name}`,
+                message: `${lm.court_number}번 코트 경기가 ${elapsed}분째 진행 중 (평균 ${avgDuration}분)`,
+                detail: `현재 점수: ${lm.team1_set1 || 0}-${lm.team2_set1 || 0}`,
+                elapsed_minutes: elapsed
+            })
+        }
+    }
+
+    // ── 3) 유휴 코트 감지: 활발히 경기 중인 대회에서 비어있는 코트 ──
+    const numCourts = tournament.courts || 6
+    const { results: busyCourts } = await c.env.DB.prepare(`
+        SELECT DISTINCT court_number FROM matches 
+        WHERE tournament_id = ? AND status = 'playing'
+    `).bind(tid).all() as any
+    const busySet = new Set((busyCourts || []).map((r: any) => r.court_number))
+
+    const { results: pendingAny } = await c.env.DB.prepare(`
+        SELECT COUNT(*) as cnt FROM matches WHERE tournament_id = ? AND status = 'pending'
+    `).bind(tid).first() as any
+    const hasPending = (pendingAny as any)?.cnt > 0
+
+    if (hasPending && busySet.size > 0) {
+        for (let court = 1; court <= numCourts; court++) {
+            if (!busySet.has(court)) {
+                // 이 코트에 대기 경기가 있는지 확인
+                const pendingOnCourt = await c.env.DB.prepare(`
+                    SELECT COUNT(*) as cnt FROM matches 
+                    WHERE tournament_id = ? AND court_number = ? AND status = 'pending'
+                `).bind(tid, court).first() as any
+                if (pendingOnCourt?.cnt > 0) {
+                    alerts.push({
+                        type: 'idle_court',
+                        severity: 'info',
+                        icon: '🏟️',
+                        court: court,
+                        message: `${court}번 코트가 비어 있습니다 (대기 경기 ${pendingOnCourt.cnt}개)`,
+                        detail: '다음 경기를 시작해주세요',
+                        pending_count: pendingOnCourt.cnt
+                    })
+                }
+            }
+        }
+    }
+
+    // ── 4) 점수 이상 감지: 현재 진행 중인 경기에서 큰 점수차 ──
+    for (const lm of (longMatches || [])) {
+        const s1 = (lm.team1_set1 || 0)
+        const s2 = (lm.team2_set1 || 0)
+        const diff = Math.abs(s1 - s2)
+        const maxScore = Math.max(s1, s2)
+        if (diff >= 15 && maxScore >= 20) {
+            alerts.push({
+                type: 'score_anomaly',
+                severity: 'info',
+                icon: '📊',
+                match_id: lm.id,
+                court: lm.court_number,
+                event: lm.event_name,
+                teams: `${lm.team1_name} vs ${lm.team2_name}`,
+                message: `대 점수차 경기: ${s1}-${s2} (${diff}점 차이)`,
+                detail: `${lm.team1_name} ${s1} vs ${s2} ${lm.team2_name}`
+            })
+        }
+    }
+
+    // 심각도 순 정렬
+    const severityOrder: Record<string, number> = { critical: 0, warning: 1, info: 2 }
+    alerts.sort((a, b) => (severityOrder[a.severity] ?? 9) - (severityOrder[b.severity] ?? 9))
+
+    // 요약 통계
+    const summary = {
+        total_alerts: alerts.length,
+        critical: alerts.filter(a => a.severity === 'critical').length,
+        warning: alerts.filter(a => a.severity === 'warning').length,
+        info: alerts.filter(a => a.severity === 'info').length,
+        playing_courts: busySet.size,
+        total_courts: numCourts,
+        idle_courts: numCourts - busySet.size,
+        checked_at: nowISO
+    }
+
+    return c.json({ alerts, summary })
+})
+
+// ═══════════════════════════════════════════════════════════════
+// ▶️  기능 2: 다음 경기 자동 시작 제안
+// ═══════════════════════════════════════════════════════════════
+app.get('/:tid/matches/:mid/next-suggestion', async (c) => {
+    const tid = c.req.param('tid')
+    const mid = c.req.param('mid')
+
+    // 방금 완료된 경기 정보
+    const completed = await c.env.DB.prepare(`
+        SELECT m.court_number, m.event_id, m.status, m.winner_team,
+               t1.team_name as team1_name, t2.team_name as team2_name,
+               e.name as event_name
+        FROM matches m
+        LEFT JOIN teams t1 ON m.team1_id = t1.id
+        LEFT JOIN teams t2 ON m.team2_id = t2.id
+        LEFT JOIN events e ON m.event_id = e.id
+        WHERE m.id = ? AND m.tournament_id = ?
+    `).bind(mid, tid).first() as any
+    if (!completed) return c.json({ error: 'Match not found' }, 404)
+
+    const suggestions: any[] = []
+
+    // 같은 코트의 다음 대기 경기
+    if (completed.court_number) {
+        const nextOnCourt = await c.env.DB.prepare(`
+            SELECT m.id, m.court_number, m.scheduled_time, m.round, m.match_order,
+                   t1.team_name as team1_name, t2.team_name as team2_name,
+                   e.name as event_name, e.category
+            FROM matches m
+            LEFT JOIN teams t1 ON m.team1_id = t1.id
+            LEFT JOIN teams t2 ON m.team2_id = t2.id
+            LEFT JOIN events e ON m.event_id = e.id
+            WHERE m.tournament_id = ? AND m.court_number = ? AND m.status = 'pending'
+            ORDER BY CASE WHEN m.scheduled_time IS NOT NULL THEN 0 ELSE 1 END,
+                     m.scheduled_time ASC, m.round ASC, m.match_order ASC
+            LIMIT 1
+        `).bind(tid, completed.court_number).first() as any
+
+        if (nextOnCourt) {
+            suggestions.push({
+                type: 'same_court',
+                priority: 1,
+                match_id: nextOnCourt.id,
+                court: nextOnCourt.court_number,
+                event: nextOnCourt.event_name,
+                teams: `${nextOnCourt.team1_name} vs ${nextOnCourt.team2_name}`,
+                scheduled_time: nextOnCourt.scheduled_time,
+                message: `${nextOnCourt.court_number}번 코트 다음 경기 준비됨`,
+                action_label: '▶️ 바로 시작',
+                action_url: `/api/tournaments/${tid}/court/${nextOnCourt.court_number}/next`
+            })
+        }
+    }
+
+    // 같은 종목의 다른 코트 대기 경기 (코트 미배정)
+    const unassigned = await c.env.DB.prepare(`
+        SELECT m.id, m.round, m.match_order,
+               t1.team_name as team1_name, t2.team_name as team2_name,
+               e.name as event_name
+        FROM matches m
+        LEFT JOIN teams t1 ON m.team1_id = t1.id
+        LEFT JOIN teams t2 ON m.team2_id = t2.id
+        LEFT JOIN events e ON m.event_id = e.id
+        WHERE m.tournament_id = ? AND m.event_id = ? AND m.status = 'pending'
+          AND (m.court_number IS NULL OR m.court_number = 0)
+        ORDER BY m.round ASC, m.match_order ASC
+        LIMIT 3
+    `).bind(tid, completed.event_id).all() as any
+
+    for (const u of (unassigned?.results || [])) {
+        suggestions.push({
+            type: 'unassigned',
+            priority: 2,
+            match_id: u.id,
+            court: completed.court_number,
+            event: u.event_name,
+            teams: `${u.team1_name} vs ${u.team2_name}`,
+            message: `코트 미배정 경기 → ${completed.court_number}번 코트에 배정 가능`,
+            action_label: '📌 이 코트에 배정'
+        })
+    }
+
+    return c.json({
+        completed_match: {
+            id: parseInt(mid),
+            court: completed.court_number,
+            event: completed.event_name,
+            result: `${completed.team1_name} vs ${completed.team2_name}`
+        },
+        suggestions,
+        has_next: suggestions.length > 0
+    })
+})
+
+// ═══════════════════════════════════════════════════════════════
+// ✅  기능 3: 경기 결과 자동 검증
+// ═══════════════════════════════════════════════════════════════
+app.post('/:tid/matches/:mid/validate', async (c) => {
+    const tid = c.req.param('tid')
+    const mid = c.req.param('mid')
+    const body = await c.req.json()
+    const { team1_set1, team1_set2, team1_set3, team2_set1, team2_set2, team2_set3, winner_team } = body
+
+    const match = await c.env.DB.prepare(`
+        SELECT m.*, t.sport_type,
+               t1.team_name as team1_name, t2.team_name as team2_name
+        FROM matches m
+        JOIN tournaments t ON m.tournament_id = t.id
+        LEFT JOIN teams t1 ON m.team1_id = t1.id
+        LEFT JOIN teams t2 ON m.team2_id = t2.id
+        WHERE m.id = ? AND m.tournament_id = ?
+    `).bind(mid, tid).first() as any
+    if (!match) return c.json({ error: 'Match not found' }, 404)
+
+    const warnings: any[] = []
+    const errors: any[] = []
+    const isTennis = match.sport_type === 'tennis'
+
+    const sets = [
+        { s1: team1_set1 ?? 0, s2: team2_set1 ?? 0, num: 1 },
+        { s1: team1_set2 ?? 0, s2: team2_set2 ?? 0, num: 2 },
+        { s1: team1_set3 ?? 0, s2: team2_set3 ?? 0, num: 3 }
+    ]
+
+    for (const set of sets) {
+        if (set.s1 === 0 && set.s2 === 0) continue // 미사용 세트
+
+        if (isTennis) {
+            // 테니스: 일반적으로 게임수 0~7
+            if (set.s1 > 7 || set.s2 > 7) {
+                warnings.push({
+                    type: 'unusual_score',
+                    set: set.num,
+                    message: `${set.num}세트 점수가 비정상입니다: ${set.s1}-${set.s2} (테니스 최대 7게임)`,
+                    icon: '⚠️'
+                })
+            }
+        } else {
+            // 배드민턴: 일반적으로 0~30
+            if (set.s1 > 30 || set.s2 > 30) {
+                errors.push({
+                    type: 'invalid_score',
+                    set: set.num,
+                    message: `${set.num}세트 점수 범위 초과: ${set.s1}-${set.s2} (배드민턴 최대 30점)`,
+                    icon: '🚫'
+                })
+            }
+
+            // 21점(또는 그 이상) 제도 체크
+            const maxS = Math.max(set.s1, set.s2)
+            const minS = Math.min(set.s1, set.s2)
+            if (maxS >= 21 && maxS <= 29 && maxS - minS < 2) {
+                warnings.push({
+                    type: 'deuce_check',
+                    set: set.num,
+                    message: `${set.num}세트 듀스 규칙 확인: ${set.s1}-${set.s2} (2점 차이 필요)`,
+                    icon: '⚠️'
+                })
+            }
+
+            // 큰 점수차 경고
+            const diff = Math.abs(set.s1 - set.s2)
+            if (diff >= 15 && maxS >= 21) {
+                warnings.push({
+                    type: 'large_gap',
+                    set: set.num,
+                    message: `${set.num}세트 큰 점수 차이: ${set.s1}-${set.s2} (${diff}점차)`,
+                    icon: '📊'
+                })
+            }
+        }
+
+        // 음수 점수 체크
+        if (set.s1 < 0 || set.s2 < 0) {
+            errors.push({
+                type: 'negative_score',
+                set: set.num,
+                message: `${set.num}세트 음수 점수 불가: ${set.s1}-${set.s2}`,
+                icon: '🚫'
+            })
+        }
+    }
+
+    // 승자 검증
+    if (winner_team) {
+        const activeSets = sets.filter(s => s.s1 > 0 || s.s2 > 0)
+        let t1Wins = 0, t2Wins = 0
+        for (const s of activeSets) {
+            if (s.s1 > s.s2) t1Wins++
+            else if (s.s2 > s.s1) t2Wins++
+        }
+        const expectedWinner = t1Wins > t2Wins ? match.team1_id : (t2Wins > t1Wins ? match.team2_id : null)
+        if (expectedWinner && expectedWinner !== winner_team) {
+            warnings.push({
+                type: 'winner_mismatch',
+                message: `선택한 승자가 세트 점수와 일치하지 않습니다 (세트 승수: ${t1Wins}-${t2Wins})`,
+                icon: '⚠️',
+                expected_winner: expectedWinner,
+                selected_winner: winner_team
+            })
+        }
+    }
+
+    // 경기 시간 이상 체크 (이미 진행 중인 경기 대상)
+    if (match.status === 'playing' && match.updated_at) {
+        const started = new Date(match.updated_at)
+        const elapsed = Math.round((Date.now() - started.getTime()) / 60000)
+        const avgDuration = isTennis ? 40 : 20
+        if (elapsed > avgDuration * 3) {
+            warnings.push({
+                type: 'long_duration',
+                message: `경기 시간이 ${elapsed}분으로 평균(${avgDuration}분)의 3배를 초과했습니다`,
+                icon: '⌛',
+                elapsed_minutes: elapsed
+            })
+        }
+    }
+
+    const isValid = errors.length === 0
+    const hasWarnings = warnings.length > 0
+
+    return c.json({
+        valid: isValid,
+        has_warnings: hasWarnings,
+        can_save: isValid, // error가 없으면 저장 가능  
+        errors,
+        warnings,
+        summary: isValid
+            ? (hasWarnings ? `⚠️ ${warnings.length}건 확인 필요 (저장 가능)` : '✅ 정상 점수')
+            : `🚫 ${errors.length}건 오류 발견 — 수정 필요`
+    })
+})
 
 export default app
