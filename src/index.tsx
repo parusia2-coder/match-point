@@ -24,6 +24,7 @@ import boardHtml from './pages/board.html?raw'
 import myHtml from './pages/my.html?raw'
 import timelineHtml from './pages/timeline.html?raw'
 import printHtml from './pages/print.html?raw'
+import builderHtml from './pages/builder.html?raw'
 import { requireAuth } from './middleware/auth'
 
 type Bindings = { DB: D1Database; AI: any; JWT_SECRET: string, TOSS_SECRET_KEY: string }
@@ -807,6 +808,11 @@ app.get('/robots.txt', (c) => {
 // Court scoreboard
 app.get('/court', (c) => {
   return c.html(courtHtml.replace(/\$\{commonHead\}/g, commonHead))
+})
+
+// Website Builder
+app.get('/builder', (c) => {
+  return c.html(builderHtml)
 })
 
 // Public Tournament Portal (대회 정보 포털)

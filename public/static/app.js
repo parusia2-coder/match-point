@@ -1334,6 +1334,7 @@ async function openSiteEditor(orgId, slug) {
       <div class="se-header">
         <h2 style="display:flex;align-items:center;gap:8px;">🌐 사이트 에디터 <button onclick="openAiSiteBuilder()" style="background:linear-gradient(45deg,#ff007f,#7928ca);color:#fff;border:none;border-radius:20px;padding:4px 12px;font-size:0.8rem;cursor:pointer;font-weight:bold;margin-left:12px;animation: pulse 2s infinite;">✨ AI 자동 완성</button></h2>
         <div class="se-btns">
+          <a href="/builder?org=${orgId}" class="se-save" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:.9rem">🏗️ 전문 빌더</a>
           <button class="se-back" onclick="renderApp()">← 돌아가기</button>
           <button class="se-save" id="seSaveBtn" onclick="saveSiteConfig('${orgId}')">💾 저장</button>
         </div>

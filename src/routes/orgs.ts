@@ -1482,7 +1482,8 @@ orgs.put('/:id/site-config', requireAuth, async (c) => {
         const configFields = ['hero_title', 'hero_subtitle', 'hero_cta_primary', 'hero_cta_secondary',
             'show_schedule', 'show_notice', 'show_join_form', 'show_about',
             'about_title', 'about_text', 'contact_phone', 'contact_address', 'contact_email',
-            'sns_instagram', 'sns_blog', 'sns_youtube', 'footer_text', 'template_id']
+            'sns_instagram', 'sns_blog', 'sns_youtube', 'footer_text', 'template_id',
+            'color_bg', 'color_text', 'sections']
 
         const config: any = {}
         for (const f of configFields) {
