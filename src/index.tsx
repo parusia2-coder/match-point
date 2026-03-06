@@ -221,6 +221,7 @@ app.get('/', (c) => {
   <script src="/static/auth.js?v=20260306_AI"></script>
   <script src="/static/ranking.js?v=20260306_AI"></script>
   <script src="/static/report.js?v=20260306_AI"></script>
+  <script src="/static/ai_dashboard.js?v=20260306_AI"></script>
   <script src="/static/broadcast.js?v=20260306_AI"></script>
 ${renderSWAndEnd()}
 `)

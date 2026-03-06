@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { broadcastUpdate } from './live'
+import { updateEloAfterMatch } from '../elo'
 
 type Bindings = { DB: D1Database }
 const app = new Hono<{ Bindings: Bindings }>()
@@ -79,6 +80,8 @@ app.put('/:tid/matches/:mid/score', async (c) => {
         }
         // 🔴 개인 경기 기록 자동 저장
         await saveMemberMatchRecords(c.env.DB, parseInt(mid), parseInt(tid), body)
+        // 🏆 Elo 레이팅 자동 업데이트
+        await updateEloAfterMatch(c.env.DB, parseInt(mid), parseInt(tid), body)
     }
 
     // Send push notifications when match starts

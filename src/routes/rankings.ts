@@ -42,6 +42,8 @@ rankings.get('/', async (c) => {
     const { results } = await c.env.DB.prepare(`
         SELECT
             m.id, m.name, m.gender, m.level, m.club,
+            COALESCE(m.elo_rating, 1500) AS elo_rating,
+            COALESCE(m.elo_peak, 1500) AS elo_peak,
             COUNT(r.id)                                                        AS total_games,
             SUM(CASE WHEN r.result = 'win'  THEN 1 ELSE 0 END)               AS wins,
             SUM(CASE WHEN r.result = 'loss' THEN 1 ELSE 0 END)               AS losses,
@@ -49,11 +51,6 @@ rankings.get('/', async (c) => {
                 100.0 * SUM(CASE WHEN r.result = 'win' THEN 1 ELSE 0 END)
                 / MAX(1, COUNT(r.id)), 1
             )                                                                  AS win_rate,
-            -- 레이팅: 승리 10점 + 패배 2점 + 득점 보너스
-            CAST(
-                SUM(CASE WHEN r.result = 'win' THEN 10 ELSE 2 END)
-                + SUM(MAX(0, COALESCE(r.my_score, 0) - COALESCE(r.opp_score, 0))) / 5.0
-            AS INTEGER)                                                        AS rating,
             COUNT(DISTINCT r.tournament_id)                                   AS tournament_count,
             MAX(r.created_at)                                                  AS last_match_at
         FROM members m
@@ -62,7 +59,7 @@ rankings.get('/', async (c) => {
         ${memberWhere}
         GROUP BY m.id
         HAVING total_games >= ?
-        ORDER BY rating DESC, win_rate DESC, total_games DESC
+        ORDER BY elo_rating DESC, win_rate DESC, total_games DESC
         LIMIT ?
     `).bind(...params, minGames, limit).all()
 
@@ -130,15 +127,13 @@ rankings.get('/member/:id', async (c) => {
         // 기본 정보
         c.env.DB.prepare('SELECT * FROM members WHERE id = ? AND active = 1').bind(memberId).first(),
 
-        // 전체 통계
+        // 전체 통계 + Elo
         c.env.DB.prepare(`
             SELECT
                 COUNT(*)                                                   AS total_games,
                 SUM(CASE WHEN result='win'  THEN 1 ELSE 0 END)           AS wins,
                 SUM(CASE WHEN result='loss' THEN 1 ELSE 0 END)           AS losses,
                 ROUND(100.0 * SUM(CASE WHEN result='win' THEN 1 ELSE 0 END) / MAX(1,COUNT(*)), 1) AS win_rate,
-                CAST(SUM(CASE WHEN result='win' THEN 10 ELSE 2 END)
-                     + SUM(MAX(0,COALESCE(my_score,0)-COALESCE(opp_score,0)))/5.0 AS INTEGER) AS rating,
                 SUM(my_score)                                             AS total_pts_for,
                 SUM(opp_score)                                            AS total_pts_against,
                 COUNT(DISTINCT tournament_id)                             AS tournaments
@@ -168,26 +163,123 @@ rankings.get('/member/:id', async (c) => {
 
     if (!basic) return c.json({ error: '회원을 찾을 수 없습니다.' }, 404)
 
-    // 현재 랭킹 순위 계산
-    const myRating = (stat as any)?.rating || 0
+    // Elo 기반 순위 계산
+    const myElo = (basic as any)?.elo_rating || 1500
     const { results: aboveMe } = await c.env.DB.prepare(`
-        SELECT COUNT(DISTINCT m.id) AS cnt
-        FROM members m
-        JOIN member_match_records r ON r.member_id = m.id
-        WHERE m.active = 1
-        GROUP BY m.id
-        HAVING CAST(SUM(CASE WHEN r.result='win' THEN 10 ELSE 2 END)
-                    + SUM(MAX(0,COALESCE(r.my_score,0)-COALESCE(r.opp_score,0)))/5.0 AS INTEGER) > ?
-    `).bind(myRating).all()
+        SELECT COUNT(*) AS cnt FROM members
+        WHERE active = 1 AND COALESCE(elo_rating, 1500) > ?
+          AND id IN (SELECT DISTINCT member_id FROM member_match_records)
+    `).bind(myElo).all()
 
-    const rank = aboveMe.length + 1
+    const rank = (aboveMe as any[])?.[0]?.cnt + 1 || 1
+
+    // 최근 Elo 변동 (최근 10건)
+    const { results: eloHistory } = await c.env.DB.prepare(`
+        SELECT old_elo, new_elo, delta, result, event_name, created_at
+        FROM elo_history WHERE member_id = ?
+        ORDER BY created_at DESC LIMIT 10
+    `).bind(memberId).all()
+
+    // 연승/연패 계산
+    let streak = 0
+    let streakType = ''
+    for (const r of recent.results as any[]) {
+        if (streakType === '') streakType = r.result
+        if (r.result === streakType) streak++
+        else break
+    }
 
     return c.json({
         member: basic,
-        stat: { ...stat as any, rank },
+        stat: {
+            ...stat as any,
+            elo_rating: myElo,
+            elo_peak: (basic as any)?.elo_peak || 1500,
+            rank
+        },
         recent: recent.results,
-        rivals: rivals.results
+        rivals: rivals.results,
+        elo_history: eloHistory,
+        streak: { count: streak, type: streakType }
     })
+})
+
+// ── Elo 히스토리 (그래프용) ────────────────────────────────────
+rankings.get('/member/:id/elo-history', async (c) => {
+    const memberId = c.req.param('id')
+    const limit = Math.min(parseInt(c.req.query('limit') || '50'), 200)
+
+    const { results } = await c.env.DB.prepare(`
+        SELECT h.old_elo, h.new_elo, h.delta, h.opponent_elo,
+               h.result, h.event_name, h.created_at,
+               t.name AS tournament_name
+        FROM elo_history h
+        LEFT JOIN tournaments t ON h.tournament_id = t.id
+        WHERE h.member_id = ?
+        ORDER BY h.created_at ASC
+        LIMIT ?
+    `).bind(memberId, limit).all()
+
+    // 현재 Elo도 함께 반환
+    const member = await c.env.DB.prepare(
+        'SELECT elo_rating, elo_peak FROM members WHERE id = ?'
+    ).bind(memberId).first() as any
+
+    return c.json({
+        current_elo: member?.elo_rating ?? 1500,
+        peak_elo: member?.elo_peak ?? 1500,
+        history: results
+    })
+})
+
+// ── Elo 리더보드 (TOP N) ──────────────────────────────────────
+rankings.get('/elo-leaderboard', async (c) => {
+    const user = c.get('adminUser') as any
+    const limit = Math.min(parseInt(c.req.query('limit') || '20'), 100)
+    const sport = c.req.query('sport') || ''
+
+    let ownerWhere = 'WHERE m.active = 1'
+    const params: any[] = []
+    if (user?.id) { ownerWhere += ' AND m.owner_id = ?'; params.push(user.id) }
+    else { ownerWhere += ' AND m.owner_id IS NULL' }
+
+    // sport 필터
+    const sportFilter = sport
+        ? `AND m.id IN (
+            SELECT DISTINCT r.member_id FROM member_match_records r
+            JOIN tournaments trn ON r.tournament_id = trn.id
+            WHERE trn.sport_type = '${sport.replace(/'/g, '')}'
+        )`
+        : ''
+
+    const { results } = await c.env.DB.prepare(`
+        SELECT m.id, m.name, m.gender, m.level, m.club,
+               COALESCE(m.elo_rating, 1500) AS elo_rating,
+               COALESCE(m.elo_peak, 1500) AS elo_peak,
+               (
+                   SELECT COUNT(*) FROM member_match_records WHERE member_id = m.id
+               ) AS total_games,
+               (
+                   SELECT COUNT(*) FROM member_match_records WHERE member_id = m.id AND result = 'win'
+               ) AS wins,
+               (
+                   SELECT delta FROM elo_history WHERE member_id = m.id ORDER BY created_at DESC LIMIT 1
+               ) AS last_delta
+        FROM members m
+        ${ownerWhere}
+        ${sportFilter}
+        AND m.id IN (SELECT DISTINCT member_id FROM member_match_records)
+        ORDER BY elo_rating DESC
+        LIMIT ?
+    `).bind(...params, limit).all()
+
+    const ranked = (results as any[]).map((row, i) => ({
+        rank: i + 1,
+        ...row,
+        win_rate: row.total_games > 0 ? Math.round((row.wins / row.total_games) * 1000) / 10 : 0
+    }))
+
+    return c.json({ leaderboard: ranked, total: ranked.length })
 })
 
 export default rankings

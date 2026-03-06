@@ -16,6 +16,7 @@ const STATIC_ASSETS = [
     '/static/auth.js',
     '/static/ranking.js',
     '/static/report.js',
+    '/static/ai_dashboard.js',
     '/static/manifest.json',
     '/static/icons/icon-192.png',
     '/static/icons/icon-512.png',

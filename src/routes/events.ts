@@ -404,9 +404,85 @@ app.post('/:tid/events/:eid/assign-groups', async (c) => {
     const body = await c.req.json() || {}
     const teamsPerGroup = body.teams_per_group || 5
     const avoidClub = body.avoid_club_in_group !== false
+    const useElo = body.use_elo !== false  // 기본: Elo 균형 사용
 
-    await assignGroups(c.env.DB, parseInt(eid), parseInt(tid), teamsPerGroup, avoidClub)
-    return c.json({ success: true })
+    const analysis = await assignGroups(c.env.DB, parseInt(eid), parseInt(tid), teamsPerGroup, avoidClub, useElo)
+    return c.json({ success: true, ...analysis })
+})
+
+// ── AI 조 편성 분석 ──────────────────────────────────────────
+app.get('/:tid/events/:eid/group-analysis', async (c) => {
+    const eid = c.req.param('eid')
+
+    const { results: teams } = await c.env.DB.prepare(
+        `SELECT t.*, p1.club as p1_club, p2.club as p2_club,
+                p1.member_id as p1_mid, p2.member_id as p2_mid,
+                m1.elo_rating as p1_elo, m2.elo_rating as p2_elo
+         FROM teams t
+         JOIN participants p1 ON t.player1_id = p1.id
+         JOIN participants p2 ON t.player2_id = p2.id
+         LEFT JOIN members m1 ON p1.member_id = m1.id
+         LEFT JOIN members m2 ON p2.member_id = m2.id
+         WHERE t.event_id = ? ORDER BY t.group_num, t.id`
+    ).bind(eid).all() as any
+
+    if (teams.length === 0) return c.json({ error: '팀이 없습니다.' }, 404)
+
+    // 조별 분석
+    const groupMap: Record<number, any[]> = {}
+    for (const t of teams) {
+        const g = t.group_num || 0
+        if (!groupMap[g]) groupMap[g] = []
+        const teamElo = Math.round(((t.p1_elo ?? 1500) + (t.p2_elo ?? 1500)) / 2)
+        groupMap[g].push({ ...t, team_elo: teamElo })
+    }
+
+    const groupStats = Object.entries(groupMap).map(([groupNum, groupTeams]) => {
+        const elos = groupTeams.map((t: any) => t.team_elo)
+        const avg = Math.round(elos.reduce((a: number, b: number) => a + b, 0) / elos.length)
+        const std = Math.round(Math.sqrt(elos.reduce((sq: number, elo: number) => sq + Math.pow(elo - avg, 2), 0) / elos.length))
+        const clubs = [...new Set(groupTeams.flatMap((t: any) => [t.p1_club, t.p2_club].filter(Boolean)))]
+        const clubDups = groupTeams.length - clubs.length
+
+        return {
+            group: parseInt(groupNum),
+            teams: groupTeams.length,
+            avg_elo: avg,
+            min_elo: Math.min(...elos),
+            max_elo: Math.max(...elos),
+            elo_std: std,
+            club_duplicates: Math.max(clubDups, 0),
+            team_details: groupTeams.map((t: any) => ({
+                id: t.id, name: t.team_name, elo: t.team_elo,
+                clubs: [t.p1_club, t.p2_club].filter(Boolean).join('/')
+            }))
+        }
+    })
+
+    // 전체 조 간 균형도
+    const avgElos = groupStats.map(g => g.avg_elo)
+    const overallAvg = Math.round(avgElos.reduce((a, b) => a + b, 0) / avgElos.length)
+    const groupSpread = Math.max(...avgElos) - Math.min(...avgElos)
+    const balanceScore = groupSpread <= 30 ? 'A' : groupSpread <= 60 ? 'B' : groupSpread <= 100 ? 'C' : 'D'
+
+    const insights: string[] = []
+    insights.push(`📊 조 간 평균 Elo 편차: ±${groupSpread} (등급: ${balanceScore})`)
+    if (balanceScore === 'A') insights.push(`✅ 매우 균형 잡힌 조 편성입니다!`)
+    else if (balanceScore === 'D') insights.push(`⚠️ 조 간 실력 차이가 큽니다. Elo 균형 재배정을 추천합니다.`)
+
+    const totalClubDups = groupStats.reduce((s, g) => s + g.club_duplicates, 0)
+    if (totalClubDups === 0) insights.push(`✅ 같은 클럽 소속이 같은 조에 없습니다.`)
+    else insights.push(`🔄 ${totalClubDups}건의 같은 클럽 중복이 있습니다.`)
+
+    return c.json({
+        total_teams: teams.length,
+        total_groups: groupStats.length,
+        overall_avg_elo: overallAvg,
+        group_spread: groupSpread,
+        balance_grade: balanceScore,
+        groups: groupStats,
+        insights
+    })
 })
 
 // Helper functions
@@ -531,45 +607,99 @@ async function autoAssignTeams(db: D1Database, tid: number, eid: number, categor
     return count
 }
 
-async function assignGroups(db: D1Database, eventId: number, tid: number, teamsPerGroup = 5, avoidClub = true) {
+// ── 조 편성: Elo 균형 + 클럽 회피 동시 최적화 ────────────────
+async function assignGroups(
+    db: D1Database, eventId: number, tid: number,
+    teamsPerGroup = 5, avoidClub = true, useElo = true
+): Promise<{ balance_grade?: string; group_spread?: number }> {
     const { results: teams } = await db.prepare(
-        `SELECT t.*, p1.club as p1_club, p2.club as p2_club
-     FROM teams t
-     JOIN participants p1 ON t.player1_id = p1.id
-     JOIN participants p2 ON t.player2_id = p2.id
-     WHERE t.event_id = ? ORDER BY RANDOM()`
+        `SELECT t.*, p1.club as p1_club, p2.club as p2_club,
+                p1.member_id as p1_mid, p2.member_id as p2_mid
+         FROM teams t
+         JOIN participants p1 ON t.player1_id = p1.id
+         JOIN participants p2 ON t.player2_id = p2.id
+         WHERE t.event_id = ?`
     ).bind(eventId).all() as any
 
-    if (teams.length === 0) return
+    if (teams.length === 0) return {}
 
-    const numGroups = Math.ceil(teams.length / teamsPerGroup)
+    // 팀별 Elo 계산
+    const teamsWithElo: any[] = []
+    for (const team of teams) {
+        let teamElo = 1500  // 기본값
+        if (useElo && (team.p1_mid || team.p2_mid)) {
+            const elos: number[] = []
+            if (team.p1_mid) {
+                const m = await db.prepare('SELECT elo_rating FROM members WHERE id = ?').bind(team.p1_mid).first() as any
+                if (m?.elo_rating) elos.push(m.elo_rating)
+            }
+            if (team.p2_mid) {
+                const m = await db.prepare('SELECT elo_rating FROM members WHERE id = ?').bind(team.p2_mid).first() as any
+                if (m?.elo_rating) elos.push(m.elo_rating)
+            }
+            if (elos.length > 0) teamElo = Math.round(elos.reduce((a, b) => a + b, 0) / elos.length)
+        }
+        teamsWithElo.push({ ...team, team_elo: teamElo })
+    }
+
+    const numGroups = Math.ceil(teamsWithElo.length / teamsPerGroup)
     const groups: any[][] = Array.from({ length: numGroups }, () => [])
 
-    // Club-avoidance assignment
-    const shuffled = [...teams]
-    for (const team of shuffled) {
-        let bestGroup = 0
-        let minConflicts = Infinity
-        let minSize = Infinity
+    if (useElo) {
+        // ── 스네이크 드래프트 + 클럽 회피 ──
+        // Elo 높은 순으로 정렬 → 스네이크 패턴으로 분배 → 클럽 충돌 최소화
+        teamsWithElo.sort((a, b) => b.team_elo - a.team_elo)
 
-        for (let g = 0; g < numGroups; g++) {
-            if (groups[g].length >= teamsPerGroup && groups.some(x => x.length < teamsPerGroup)) continue
+        for (let i = 0; i < teamsWithElo.length; i++) {
+            const team = teamsWithElo[i]
+            const snakeRound = Math.floor(i / numGroups)
+            const posInRound = i % numGroups
+            // 스네이크: 짝수 라운드 정순, 홀수 라운드 역순
+            const targetGroup = snakeRound % 2 === 0 ? posInRound : (numGroups - 1 - posInRound)
 
-            let conflicts = 0
             if (avoidClub) {
-                conflicts = groups[g].filter((t: any) =>
-                    (t.p1_club && t.p1_club === team.p1_club) || (t.p2_club && t.p2_club === team.p2_club) ||
-                    (t.p1_club && t.p1_club === team.p2_club) || (t.p2_club && t.p2_club === team.p1_club)
-                ).length
-            }
+                // 클럽 충돌 확인 — 충돌 시 인접 조와 스왑 시도
+                let bestGroup = targetGroup
+                let minConflict = countClubConflicts(groups[targetGroup], team)
 
-            if (conflicts < minConflicts || (conflicts === minConflicts && groups[g].length < minSize)) {
-                minConflicts = conflicts
-                minSize = groups[g].length
-                bestGroup = g
+                // 인접 조±1 에서 더 나은 곳 탐색
+                for (const delta of [-1, 1]) {
+                    const altGroup = targetGroup + delta
+                    if (altGroup >= 0 && altGroup < numGroups) {
+                        const altConflict = countClubConflicts(groups[altGroup], team)
+                        // 크기가 같거나 작을 때만 이동 (균형 유지)
+                        if (altConflict < minConflict && groups[altGroup].length <= groups[bestGroup].length) {
+                            minConflict = altConflict
+                            bestGroup = altGroup
+                        }
+                    }
+                }
+                groups[bestGroup].push(team)
+            } else {
+                groups[targetGroup].push(team)
             }
         }
-        groups[bestGroup].push(team)
+    } else {
+        // 기존 랜덤 방식 (클럽 회피만)
+        const shuffled = [...teamsWithElo].sort(() => Math.random() - 0.5)
+        for (const team of shuffled) {
+            let bestGroup = 0
+            let minConflicts = Infinity
+            let minSize = Infinity
+
+            for (let g = 0; g < numGroups; g++) {
+                if (groups[g].length >= teamsPerGroup && groups.some(x => x.length < teamsPerGroup)) continue
+
+                const conflicts = avoidClub ? countClubConflicts(groups[g], team) : 0
+
+                if (conflicts < minConflicts || (conflicts === minConflicts && groups[g].length < minSize)) {
+                    minConflicts = conflicts
+                    minSize = groups[g].length
+                    bestGroup = g
+                }
+            }
+            groups[bestGroup].push(team)
+        }
     }
 
     // Update group numbers
@@ -578,6 +708,23 @@ async function assignGroups(db: D1Database, eventId: number, tid: number, teamsP
             await db.prepare('UPDATE teams SET group_num = ? WHERE id = ?').bind(g + 1, team.id).run()
         }
     }
+
+    // 균형도 분석 반환
+    const avgElos = groups.map(g => {
+        const elos = g.map((t: any) => t.team_elo)
+        return elos.length > 0 ? Math.round(elos.reduce((a: number, b: number) => a + b, 0) / elos.length) : 1500
+    })
+    const groupSpread = Math.max(...avgElos) - Math.min(...avgElos)
+    const balanceScore = groupSpread <= 30 ? 'A' : groupSpread <= 60 ? 'B' : groupSpread <= 100 ? 'C' : 'D'
+
+    return { balance_grade: balanceScore, group_spread: groupSpread }
+}
+
+function countClubConflicts(group: any[], team: any): number {
+    return group.filter((t: any) =>
+        (t.p1_club && t.p1_club === team.p1_club) || (t.p2_club && t.p2_club === team.p2_club) ||
+        (t.p1_club && t.p1_club === team.p2_club) || (t.p2_club && t.p2_club === team.p1_club)
+    ).length
 }
 
 export default app

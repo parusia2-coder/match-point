@@ -4196,6 +4196,7 @@ async function renderOverview(c) {
         <a class="quick-link" href="/timeline?tid=${currentTournament.id}"><span class="icon">📅</span>타임라인</a>
         <a class="quick-link" href="/print?tid=${currentTournament.id}"><span class="icon">🖨️</span>인쇄 센터</a>
         <a class="quick-link" href="#" onclick="event.preventDefault();showTournamentReport(${currentTournament.id})"><span class="icon">📈</span>통계 리포트</a>
+        <a class="quick-link" href="#" onclick="event.preventDefault();showAiDashboard(${currentTournament.id})" style="background:linear-gradient(135deg,rgba(139,92,246,0.08),rgba(249,115,22,0.08));border:1px solid rgba(139,92,246,0.2);"><span class="icon">🧠</span>AI 대시보드</a>
       </div>
     `;
 
