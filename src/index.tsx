@@ -29,6 +29,12 @@ import { requireAuth } from './middleware/auth'
 type Bindings = { DB: D1Database; AI: any; JWT_SECRET: string, TOSS_SECRET_KEY: string }
 const app = new Hono<{ Bindings: Bindings }>()
 
+// Global error handler — 상세 에러 반환
+app.onError((err, c) => {
+  console.error('[WORKER ERROR]', err.message, err.stack)
+  return c.json({ error: err.message, stack: err.stack }, 500)
+})
+
 // Static files
 app.use('/static/*', serveStatic())
 app.get('/sw.js', serveStatic())

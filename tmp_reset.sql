@@ -1,0 +1,15 @@
+PRAGMA foreign_keys = OFF;
+DELETE FROM member_match_records;
+DELETE FROM member_tournament_history;
+DELETE FROM push_subscriptions;
+DELETE FROM notification_logs;
+DELETE FROM venues;
+DELETE FROM standings;
+DELETE FROM audit_logs;
+DELETE FROM payment_transactions;
+DELETE FROM matches;
+DELETE FROM teams;
+DELETE FROM events;
+DELETE FROM participants;
+DELETE FROM tournaments;
+PRAGMA foreign_keys = ON;

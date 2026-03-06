@@ -210,31 +210,35 @@ app.delete('/:id', async (c) => {
             return c.json({ error: '삭제 권한이 없습니다.' }, 403)
         }
 
-        // 종속 데이터 삭제 (테이블이 없을 수도 있으므로 각각 try-catch)
+        // FK 제약을 비활성화하고 종속 데이터 삭제
+        await c.env.DB.prepare('PRAGMA foreign_keys = OFF').run()
+
         const deleteTables = [
+            'DELETE FROM member_match_records WHERE tournament_id = ?',
+            'DELETE FROM member_tournament_history WHERE tournament_id = ?',
+            'DELETE FROM notification_logs WHERE tournament_id = ?',
+            'DELETE FROM push_subscriptions WHERE tournament_id = ?',
+            'DELETE FROM payment_transactions WHERE tournament_id = ?',
+            'DELETE FROM venues WHERE tournament_id = ?',
             'DELETE FROM standings WHERE event_id IN (SELECT id FROM events WHERE tournament_id = ?)',
+            'DELETE FROM audit_logs WHERE tournament_id = ?',
             'DELETE FROM matches WHERE tournament_id = ?',
             'DELETE FROM teams WHERE tournament_id = ?',
             'DELETE FROM events WHERE tournament_id = ?',
-            'DELETE FROM audit_logs WHERE tournament_id = ?',
-            'DELETE FROM venues WHERE tournament_id = ?',
-            'DELETE FROM push_subscriptions WHERE tournament_id = ?',
-            'DELETE FROM push_notifications WHERE tournament_id = ?',
-            'DELETE FROM member_tournament_history WHERE tournament_id = ?',
-            'DELETE FROM member_match_records WHERE tournament_id = ?',
-            'DELETE FROM elo_history WHERE tournament_id = ?',
-            'DELETE FROM payments WHERE tournament_id = ?',
         ]
         for (const sql of deleteTables) {
             try { await c.env.DB.prepare(sql).bind(id).run() } catch (e) { /* table may not exist */ }
         }
 
-        // 참가자 및 대회 정보는 이력 보존을 위해 소프트 딜리트
+        // 참가자 및 대회 정보는 소프트 딜리트
         try { await c.env.DB.prepare('UPDATE participants SET deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE tournament_id = ?').bind(id).run() } catch (e) { }
         await c.env.DB.prepare('UPDATE tournaments SET deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(id).run()
 
+        await c.env.DB.prepare('PRAGMA foreign_keys = ON').run()
+
         return c.json({ success: true })
     } catch (e: any) {
+        try { await c.env.DB.prepare('PRAGMA foreign_keys = ON').run() } catch (x) { }
         return c.json({ error: e.message || 'Delete failed', detail: e.stack }, 500)
     }
 })
